@@ -21,12 +21,14 @@ import {
   removeCustomTemplate,
   resetTemplateContent,
   resetTheme,
+  restartSetup,
   exportKit,
   importKit,
   setDraftTemplate,
   DRAFT_ID,
 } from './kit.js';
 import { startFromTemplate, editTemplate } from './create.js';
+import { brandPreview, logoFields, colorFields, fontFields, brandInput, brandChange, brandClick, loadLogoColors, showWizard, syncBrandFields } from './wizard.js';
 
 const ui = {
   tab: 'plantillas', // plantillas | marca
@@ -51,7 +53,17 @@ function templateCard({ key, name, description, badge, actions }) {
 
 function renderTemplates() {
   const kit = getKit();
-  const groups = [...new Set(BUILTIN_TEMPLATES.map((t) => t.group))];
+  // Las plantillas de ejemplo (design system jpdazab) solo existen en kits anteriores al asistente.
+  const groups = kit.builtins ? [...new Set(BUILTIN_TEMPLATES.map((t) => t.group))] : [];
+  if (!kit.builtins && !kit.customTemplates.length) {
+    return `
+      <div class="empty-state">
+        <span class="empty-icon" aria-hidden="true">+</span>
+        <h2>Crea tu primera plantilla</h2>
+        <p class="muted">Empieza con tus colores y tipografías, o sube como fondo un diseño exportado de Figma o Canva y coloca encima las capas de texto.</p>
+        <button class="btn primary" data-design-action="new-custom">Nueva plantilla</button>
+      </div>`;
+  }
   return `
     ${groups
       .map(
@@ -75,7 +87,7 @@ function renderTemplates() {
       </div>`,
       )
       .join('')}
-    <h2 class="section-title">Mis plantillas</h2>
+    ${groups.length ? '<h2 class="section-title">Mis plantillas</h2>' : ''}
     <p class="muted small">Sube un fondo (por ejemplo, un diseño exportado de Figma) y coloca encima las capas de texto.</p>
     <div class="tpl-grid">
       ${kit.customTemplates
@@ -136,6 +148,15 @@ function renderCustomEditor() {
             </label>
             ${t.bgAssetId ? '<button class="btn ghost small" data-design-action="remove-bg">Quitar imagen de fondo</button>' : ''}
           </fieldset>
+          <fieldset class="ed-group">
+            <legend>Logo</legend>
+            ${
+              getKit().theme.logoAssetId
+                ? `<label class="check"><input type="checkbox" data-tpl-logo ${t.logo?.show ? 'checked' : ''} /> Mostrar mi logo</label>
+                   ${t.logo?.show ? `<div class="ed-row">${num('X', 'logo.x', t.logo.x)}${num('Y', 'logo.y', t.logo.y)}${num('Alto', 'logo.h', t.logo.h, { min: 10, max: 1000 })}</div>` : ''}`
+                : '<p class="muted small">Sube tu logo en <strong>Colores y tipografía</strong> para poder usarlo en tus plantillas.</p>'
+            }
+          </fieldset>
           ${t.layers
             .map(
               (l, i) => `
@@ -173,7 +194,38 @@ function renderCustomEditor() {
 
 // ---------- Marca: colores, tipografía, firma ----------
 
+// Marca definida con el asistente: cuatro colores, dos tipografías, firma y logo.
+function renderSimpleBrand() {
+  const { fonts } = getKit();
+  return `
+    <div class="brand-layout">
+      <div class="editor-panel">
+        <fieldset class="ed-group"><legend>Firma y logo</legend>${logoFields()}</fieldset>
+        <fieldset class="ed-group"><legend>Colores</legend>${colorFields()}</fieldset>
+        <fieldset class="ed-group"><legend>Tipografías</legend>${fontFields()}
+          ${
+            fonts.length
+              ? `<ul class="font-list">${fonts
+                  .map(
+                    (f) => `<li><span style="font-family:'${esc(f.family)}'">${esc(f.family)}</span><small class="muted">${esc(f.fileName)}</small>
+                      <button class="link danger" data-design-action="remove-font" data-id="${esc(f.id)}">Quitar</button></li>`,
+                  )
+                  .join('')}</ul>`
+              : ''
+          }
+        </fieldset>
+        <p class="muted small">Los colores y tipografías son los que aparecen al crear una plantilla nueva; las plantillas ya creadas no cambian.</p>
+        <div class="actions start"><button class="btn ghost" data-design-action="rerun-wizard">Repetir el asistente</button></div>
+      </div>
+      <div class="edit-preview">
+        <p class="muted small">Vista previa</p>
+        <div class="brand-previews" id="brand-preview">${brandPreview()}</div>
+      </div>
+    </div>`;
+}
+
 function renderBrand() {
+  if (!getKit().builtins) return renderSimpleBrand();
   const { theme, fonts } = getKit();
   const groups = [...new Set(THEME_COLORS.map((c) => c.group))];
   return `
@@ -284,7 +336,7 @@ export function renderDesigns() {
     <header class="page-head page-head-row">
       <div>
         <h1>Diseños</h1>
-        <p class="muted">Tus plantillas y tu marca: colores, tipografías, firma y logo. Los cambios se aplican a todos los posts.</p>
+        <p class="muted">Tus plantillas y tu marca: colores, tipografías, firma y logo.</p>
       </div>
       <div class="actions">
         <button class="btn ghost small" data-design-action="export-kit">⬇ Exportar kit</button>
@@ -320,6 +372,10 @@ function setPath(obj, path, value) {
 async function handle(btn) {
   const { designAction: action, id } = btn.dataset;
   switch (action) {
+    case 'rerun-wizard':
+      restartSetup();
+      showWizard(afterWizard);
+      break;
     case 'tab':
       ui.tab = btn.dataset.tab;
       renderDesigns();
@@ -425,9 +481,25 @@ async function handle(btn) {
   }
 }
 
+// Redibuja la pestaña de marca; con soft solo la vista previa (para no perder el foco al escribir).
+function rerenderBrand({ soft = false } = {}) {
+  const preview = $('#brand-preview');
+  if (soft && preview) {
+    syncBrandFields($('#designs-root'), preview);
+    return;
+  }
+  renderDesigns();
+}
+
 async function handleChange(e) {
   const el = e.target;
+  if (await brandChange(el, rerenderBrand)) return;
   try {
+    if (el.dataset.tplLogo !== undefined) {
+      ui.draft.logo = { x: 80, y: customSize(ui.draft).h - 160, h: 80, ...ui.draft.logo, show: el.checked };
+      renderDesigns();
+      return;
+    }
     if (el.dataset.fontUpload !== undefined && el.files[0]) {
       const family = await addFont(el.files[0]);
       toast(`Tipografía "${family}" añadida`);
@@ -468,6 +540,7 @@ async function handleChange(e) {
 
 function handleInput(e) {
   const el = e.target;
+  if (brandInput(el, rerenderBrand)) return;
   if (el.dataset.color) {
     updateKit((k) => (k.theme.colors[el.dataset.color] = el.value));
     const small = el.parentElement.querySelector('small');
@@ -489,7 +562,9 @@ function handleInput(e) {
 
 export function initDesignsPage() {
   const root = $('#designs-root');
-  root.addEventListener('click', (e) => {
+  root.addEventListener('click', async (e) => {
+    const brandBtn = e.target.closest('[data-brand-action]');
+    if (brandBtn && (await brandClick(brandBtn, rerenderBrand))) return;
     const btn = e.target.closest('[data-design-action]');
     if (!btn) return;
     e.preventDefault();
@@ -500,3 +575,17 @@ export function initDesignsPage() {
   window.addEventListener('resize', () => fitVisuals(root));
 }
 
+
+// Al terminar el asistente: abre Diseños y, si lo pidió, el editor de su primera plantilla.
+export function afterWizard(next) {
+  if (next === 'template') {
+    ui.tab = 'plantillas';
+    ui.draft = newCustomTemplate();
+  }
+  if (location.hash === '#/disenos') renderDesigns();
+  else location.hash = '#/disenos';
+}
+
+export async function prepareDesigns() {
+  await loadLogoColors();
+}

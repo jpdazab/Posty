@@ -166,12 +166,14 @@ function CustomTemplate({ post }) {
   if (!tpl) return h('div', { className: 'ds ds-missing' }, 'Esta plantilla ya no existe');
   const { w, h: height } = customSize(tpl);
   const bg = cachedAssetUrl(tpl.bgAssetId);
+  const logo = tpl.logo?.show ? cachedAssetUrl(getKit().theme.logoAssetId) : null;
   return h(
     'div',
     {
       className: 'ds ds-custom',
       style: { width: w, height, backgroundColor: tpl.background, backgroundImage: bg ? `url("${bg}")` : 'none' },
     },
+    logo && h('img', { key: '__logo', className: 'ds-layer ds-logo', src: logo, alt: 'Logo', style: { left: tpl.logo.x, top: tpl.logo.y, height: tpl.logo.h } }),
     tpl.layers.map((l) =>
       h(
         'div',

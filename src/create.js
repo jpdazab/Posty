@@ -57,6 +57,7 @@ const state = {
   mode: 'ai', // ai | paste | manual
   prompt: '',
   format: null,
+  templateId: null, // plantilla propia elegida
   result: null,
   error: null,
   editing: false,
@@ -150,6 +151,16 @@ function customFromText(text, templateId) {
   return normalizePost({ ...post, ...newMeta(), text: a.text, hashtags: a.hashtags, title: clip(a.hook, 50) });
 }
 
+// Post de Claude (formato card) → capas de una plantilla propia: titular y lead (o el texto).
+function customFromGenerated(data, templateId, prompt) {
+  const post = customPost(templateId);
+  const a = analyzeText(data.text || '');
+  const [first, second] = getCustomTemplate(templateId).layers;
+  if (first) post.fields[first.id] = data.card?.headline || clip(a.hook, 90);
+  if (second) post.fields[second.id] = data.card?.lead || clip(a.restSentences.slice(0, 2).join(' '), 200);
+  return normalizePost({ ...post, ...newMeta({ prompt }), text: data.text || '', hashtags: data.hashtags || [], title: data.title || clip(a.hook, 50) });
+}
+
 // Campos editables: ruta dentro del post → valor. Las rutas usan puntos ("slides.0.title").
 function getPath(obj, path) {
   return path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
@@ -203,6 +214,11 @@ function readImage(file) {
 
 // ---------- Render ----------
 
+function formatLabel() {
+  if (state.format === 'custom') return getCustomTemplate(state.templateId)?.name || FORMAT_LABELS.custom;
+  return FORMAT_LABELS[state.format];
+}
+
 function bubble(role, content) {
   return `<div class="msg msg-${role}">${role === 'assistant' ? '<span class="msg-avatar" aria-hidden="true">✳</span>' : ''}<div class="msg-content">${content}</div></div>`;
 }
@@ -235,11 +251,19 @@ function renderComposer() {
 }
 
 function renderFormatQuestion() {
+  const kit = getKit();
+  if (!kit.builtins && !kit.customTemplates.length) {
+    return bubble(
+      'assistant',
+      `<p>Aún no tienes plantillas. Crea la primera en Diseños con tus colores y tipografías y vuelve aquí para usarla.</p>
+       <div class="actions start"><button class="btn primary" data-create-action="go-designs">Crear una plantilla</button></div>`,
+    );
+  }
   return bubble(
     'assistant',
-    `<p>¿Cómo quieres que sea el post?</p>
+    `<p>¿${kit.builtins ? 'Cómo quieres que sea el post' : 'Con qué plantilla'}?</p>
      <div class="format-options">
-       <button class="format-option" data-create-action="format" data-format="carousel">
+       ${kit.builtins ? `<button class="format-option" data-create-action="format" data-format="carousel">
          <span class="format-thumb thumb-carousel" aria-hidden="true"><i></i><i></i><i></i></span>
          <strong>Carrusel</strong>
          <span>Portada y slides para subir como PDF</span>
@@ -253,7 +277,7 @@ function renderFormatQuestion() {
          <span class="format-thumb thumb-card" aria-hidden="true"><i></i></span>
          <strong>Card con lista</strong>
          <span>Titular y lista numerada</span>
-       </button>
+       </button>` : ''}
        ${getKit()
          .customTemplates.map(
            (t) => `<button class="format-option" data-create-action="format" data-format="custom" data-template="${esc(t.id)}">
@@ -460,7 +484,7 @@ function renderResult(post) {
     </article>
     <div class="gen-next">
       ${canRegenerate ? '<button class="btn ghost" data-create-action="regenerate">↻ Generar otra versión</button>' : ''}
-      ${['carousel', 'card', 'slide']
+      ${(getKit().builtins ? ['carousel', 'card', 'slide'] : [])
         .filter((f) => f !== post.format)
         .map((f) => `<button class="btn ghost" data-create-action="switch-format" data-format="${f}">Probar como ${FORMAT_LABELS[f].toLowerCase()}</button>`)
         .join('')}
@@ -479,7 +503,7 @@ function renderConversation() {
   }
 
   parts.push(bubble('assistant', `<p>¿Cómo quieres que sea el post?</p>`));
-  parts.push(bubble('user', `<p>${FORMAT_LABELS[state.format]}</p>`));
+  parts.push(bubble('user', `<p>${esc(formatLabel())}</p>`));
 
   if (state.step === 'loading') {
     parts.push(bubble('assistant', `<p class="typing"><span></span><span></span><span></span> Escribiendo tu post… suele tardar entre 20 y 60 segundos.</p>`));
@@ -550,7 +574,7 @@ export function renderCreate() {
   root.innerHTML = `
     <header class="page-head">
       <h1>Crear post</h1>
-      <p class="muted">Pide un post a Claude, pega tu texto o empieza desde cero. La gráfica sale con tu design system, lista para LinkedIn.</p>
+      <p class="muted">Pide un post a Claude, pega tu texto o empieza desde cero. La gráfica sale con tus plantillas, lista para LinkedIn.</p>
     </header>
     <section class="conversation" aria-live="polite">${renderConversation()}</section>
     ${state.step === 'prompt' ? renderHistory() : ''}`;
@@ -569,6 +593,7 @@ function schedulePreview() {
 function showResult(post, { editing = false, isNew = false } = {}) {
   state.result = post;
   state.format = post.format;
+  state.templateId = post.templateId || null;
   state.step = 'result';
   state.editing = editing;
   state.isNew = isNew;
@@ -587,7 +612,8 @@ async function generate() {
     const res = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...auth },
-      body: JSON.stringify({ prompt: state.prompt, format: state.format }),
+      // Con una plantilla propia, Claude escribe una card y su titular y texto van a las capas.
+      body: JSON.stringify({ prompt: state.prompt, format: state.format === 'custom' ? 'card' : state.format }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -597,7 +623,10 @@ async function generate() {
           (res.status === 404 ? 'El generador con Claude solo funciona con la web desplegada en Vercel y una API key configurada.' : 'No se pudo generar el post.'),
       );
     }
-    const post = normalizePost({ ...data, ...newMeta({ prompt: state.prompt }) });
+    const post =
+      state.format === 'custom'
+        ? customFromGenerated(data, state.templateId, state.prompt)
+        : normalizePost({ ...data, ...newMeta({ prompt: state.prompt }) });
     saveToHistory(post);
     showResult(post);
   } catch (err) {
@@ -651,17 +680,19 @@ async function handle(btn) {
       break;
     case 'paste-from-error':
       state.mode = 'paste';
-      createLocal(state.format);
+      createLocal(state.format, state.templateId);
       break;
     case 'format':
-      if (state.mode === 'ai' && btn.dataset.format !== 'custom') {
+      state.templateId = btn.dataset.template || null;
+      if (state.mode === 'ai') {
         state.format = btn.dataset.format;
         generate();
       } else {
-        // Las plantillas propias no pasan por Claude: con un pedido a Claude se usa como texto pegado.
-        if (state.mode === 'ai') state.mode = 'paste';
         createLocal(btn.dataset.format, btn.dataset.template);
       }
+      break;
+    case 'go-designs':
+      location.hash = '#/disenos';
       break;
     case 'back':
       state.step = 'prompt';

@@ -18,18 +18,22 @@ Páginas del menú lateral:
   jpdazab y se editan con vista previa en vivo; "Volver sin guardar" descarta los cambios. Se descargan
   en PNG (y el carrusel en PDF). Los últimos 20 posts quedan en el navegador y se pueden borrar.
 
+- **Asistente de bienvenida**: la primera vez que alguien entra, Posty empieza en blanco (sin plantillas)
+  y le pide su marca en cuatro pasos: firma y logo (del logo salen colores sugeridos), cuatro colores
+  (principal, secundario, fondo y texto, con paletas y aviso de contraste), tipografías de titulares y
+  texto (de la lista o subidas) y su primera plantilla. Se puede repetir desde Diseños.
 - **Diseños**:
-  - **Plantillas**: todas las plantillas con vista previa (card con lista, portadas, slides de texto,
-    cifras, barras, Venn e imagen, y el carrusel completo). "Usar" crea un post; "Editar" cambia el
-    contenido con el que empieza la plantilla; "Restablecer" lo devuelve al original.
+  - **Plantillas**: las plantillas propias de cada persona. Las cuentas creadas antes del asistente
+    conservan además las plantillas de ejemplo del design system jpdazab (card con lista, portadas,
+    slides y carrusel).
   - **Mis plantillas**: plantillas propias con fondo (color o imagen, por ejemplo exportada de Figma)
     y capas de texto con posición, tamaño, color, tipografía, peso y alineación.
-  - **Colores y tipografía**: cambia los colores del design system, sube tipografías (WOFF2, WOFF,
-    TTF, OTF) y asígnalas a texto, titulares o monoespaciada, cambia la firma, el texto "Swipe" y el logo.
+  - **Colores y tipografía**: los colores, tipografías, firma y logo de la marca (los mismos controles
+    del asistente). Las plantillas nuevas empiezan con ellos.
   - **Exportar / importar kit**: un JSON con todo lo anterior (incluidos los archivos) para llevarlo
     a otro navegador.
 
-  El kit se guarda en el navegador: la configuración en localStorage y los archivos en IndexedDB.
+  El kit se guarda en la cuenta (o en el navegador en modo local).
 
 - **Cuenta**: sesión, uso de Claude del mes, token para la rutina semanal y subida manual de semanas.
 

@@ -27,6 +27,29 @@ export const FONT_ROLES = [
 ];
 
 export const BUILTIN_FONTS = ['Switzer', 'Projekt Blackbird', 'Geist Mono'];
+// Fuentes que siempre están: las del proyecto y las del sistema (seguras en cualquier navegador).
+const BUNDLED_FONTS = ['Switzer', 'Geist Mono'];
+export const SYSTEM_FONTS = ['Arial', 'Helvetica', 'Georgia', 'Times New Roman', 'Verdana', 'Trebuchet MS', 'Courier New'];
+
+// Marca que define cada persona con el asistente de bienvenida.
+export const BRAND_COLORS = [
+  { key: 'primary', label: 'Principal', hint: 'Etiquetas, firma y destacados' },
+  { key: 'secondary', label: 'Secundario', hint: 'Acentos y subrayados' },
+  { key: 'background', label: 'Fondo', hint: 'Fondo de las piezas' },
+  { key: 'text', label: 'Texto', hint: 'Titulares y párrafos' },
+];
+
+export const BRAND_FONTS = [
+  { key: 'heading', label: 'Titulares' },
+  { key: 'body', label: 'Texto' },
+];
+
+function defaultBrand() {
+  return {
+    colors: { primary: '#2f5bea', secondary: '#f2a541', background: '#ffffff', text: '#16161d' },
+    fonts: { heading: 'Switzer', body: 'Switzer' },
+  };
+}
 
 export const CUSTOM_SIZES = {
   '1080x1350': { w: 1080, h: 1350, label: 'Vertical 4:5 · 1080 × 1350' },
@@ -37,7 +60,10 @@ export const CUSTOM_SIZES = {
 
 function defaultKit() {
   return {
-    theme: { colors: {}, fonts: {}, handle: '@jpdazab', swipe: 'Swipe', logoAssetId: null },
+    setupDone: false, // false → se muestra el asistente de bienvenida
+    builtins: false, // plantillas de ejemplo del design system jpdazab (solo kits anteriores al asistente)
+    brand: defaultBrand(),
+    theme: { colors: {}, fonts: {}, handle: '', swipe: 'Swipe', logoAssetId: null },
     fonts: [], // { id, family, assetId, fileName }
     templateContent: {}, // id de plantilla integrada → contenido por defecto editado
     customTemplates: [], // ver newCustomTemplate()
@@ -49,7 +75,17 @@ const listeners = new Set();
 
 function merge(parsed) {
   const base = defaultKit();
-  return parsed ? { ...base, ...parsed, theme: { ...base.theme, ...parsed.theme } } : base;
+  if (!parsed) return base;
+  // Kits guardados antes del asistente: ya estaban configurados y usaban las plantillas de ejemplo.
+  const legacy = parsed.setupDone === undefined ? { setupDone: true, builtins: true, theme: { handle: '@jpdazab' } } : { theme: {} };
+  const brand = parsed.brand || {};
+  return {
+    ...base,
+    ...legacy,
+    ...parsed,
+    brand: { colors: { ...base.brand.colors, ...brand.colors }, fonts: { ...base.brand.fonts, ...brand.fonts } },
+    theme: { ...base.theme, ...legacy.theme, ...parsed.theme },
+  };
 }
 
 // Guardado agrupado: los selectores de color disparan muchos cambios seguidos.
@@ -147,7 +183,38 @@ export async function removeFont(id) {
 }
 
 export function allFontFamilies() {
-  return [...BUILTIN_FONTS, ...kit.fonts.map((f) => f.family)];
+  const bundled = kit.builtins ? BUILTIN_FONTS : BUNDLED_FONTS;
+  return [...new Set([...kit.fonts.map((f) => f.family), ...bundled, ...SYSTEM_FONTS])];
+}
+
+// ---------- Marca ----------
+
+// La marca también pinta los componentes del design system (por si se usan las plantillas de ejemplo).
+export function setBrand(mutator) {
+  updateKit((k) => {
+    mutator(k.brand);
+    const { colors: c, fonts: f } = k.brand;
+    k.theme.colors = {
+      'carousel-accent': c.primary,
+      brand: c.primary,
+      'brand-fill': c.primary,
+      accent: c.secondary,
+      'carousel-highlight': c.secondary,
+      canvas: c.background,
+      'carousel-card': c.background,
+      ink: c.text,
+      'carousel-ink': c.text,
+    };
+    k.theme.fonts = { sans: f.body, blackbird: f.heading };
+  });
+}
+
+export function finishSetup() {
+  updateKit((k) => (k.setupDone = true));
+}
+
+export function restartSetup() {
+  updateKit((k) => (k.setupDone = false));
 }
 
 // ---------- Archivos de imagen (logo, fondos) ----------
@@ -168,17 +235,22 @@ export async function setLogo(file) {
 
 // ---------- Plantillas propias ----------
 
+// Plantilla nueva con los colores y tipografías de la marca. Las dos primeras capas reciben el
+// titular y el texto al crear un post (ver create.js), así que el orden importa.
 export function newCustomTemplate() {
+  const { colors: c, fonts: f } = kit.brand;
   return {
     id: newAssetId('tpl'),
     name: 'Nueva plantilla',
     size: '1080x1350',
-    background: '#1a1926',
+    background: c.background,
     bgAssetId: null,
+    logo: { show: Boolean(kit.theme.logoAssetId), x: 80, y: 1190, h: 80 },
     layers: [
-      { id: 'titulo', name: 'Titular', x: 80, y: 120, w: 920, size: 88, color: '#ffffff', font: 'Switzer', weight: 600, align: 'left', lineHeight: 1.05, sample: 'Tu titular aquí' },
-      { id: 'texto', name: 'Texto', x: 80, y: 420, w: 860, size: 40, color: '#e6e6e6', font: 'Switzer', weight: 400, align: 'left', lineHeight: 1.35, sample: 'Una frase de apoyo para el post.' },
-      { id: 'firma', name: 'Firma', x: 80, y: 1230, w: 600, size: 32, color: '#ffffff', font: 'Geist Mono', weight: 400, align: 'left', lineHeight: 1.2, sample: '/jpdazab' },
+      { id: 'titulo', name: 'Titular', x: 80, y: 200, w: 920, size: 88, color: c.text, font: f.heading, weight: 700, align: 'left', lineHeight: 1.05, sample: 'Tu titular aquí' },
+      { id: 'texto', name: 'Texto', x: 80, y: 560, w: 860, size: 40, color: c.text, font: f.body, weight: 400, align: 'left', lineHeight: 1.35, sample: 'Una frase de apoyo para el post.' },
+      { id: 'etiqueta', name: 'Etiqueta', x: 80, y: 120, w: 920, size: 30, color: c.primary, font: f.body, weight: 600, align: 'left', lineHeight: 1.2, sample: 'TEMA' },
+      { id: 'firma', name: 'Firma', x: 500, y: 1215, w: 500, size: 30, color: c.primary, font: f.body, weight: 600, align: 'right', lineHeight: 1.2, sample: kit.theme.handle || '@tu-nombre' },
     ],
   };
 }

@@ -2,8 +2,9 @@ import { parseWeek, composePost, linkedInShareUrl, splitList, LINKEDIN_MAX_CHARS
 import { STATUSES, getPostState, getStatus, updatePost, exportState, importState, initStore } from './store.js';
 import { $, esc, toast, copy, linkedinIcon } from './ui.js';
 import { initCreatePage, renderCreate, initCreateData } from './create.js';
-import { initDesignsPage, renderDesigns } from './designs.js';
-import { initKit } from './kit.js';
+import { initDesignsPage, renderDesigns, afterWizard, prepareDesigns } from './designs.js';
+import { initKit, getKit } from './kit.js';
+import { showWizard } from './wizard.js';
 import { initBackend, getBackend, mode as backendMode } from './backend.js';
 import { showLogin } from './auth.js';
 import { initAccountPage, renderAccount } from './account.js';
@@ -540,6 +541,11 @@ async function start() {
   window.addEventListener('hashchange', showRoute);
   showRoute();
   document.body.classList.remove('loading');
+  // Primera vez: asistente de marca. Si el kit no se pudo cargar no se muestra, para no pisar el guardado.
+  if (results[2].status === 'fulfilled') {
+    if (getKit().setupDone) prepareDesigns();
+    else showWizard(afterWizard);
+  }
 }
 
 start();
