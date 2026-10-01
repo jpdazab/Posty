@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Posty · Propuestas LinkedIn</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a66c2'/%3E%3Ctext x='16' y='23' font-family='Arial' font-weight='700' font-size='19' fill='white' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">P</span>
+        <div>
+          <h1>Posty</h1>
+          <p>Propuestas semanales para LinkedIn</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn ghost" id="export-btn" title="Descargar respaldo del estado">Exportar</button>
+        <label class="btn ghost" title="Restaurar respaldo">
+          Importar
+          <input type="file" id="import-input" accept="application/json" hidden />
+        </label>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="stats" id="stats"></section>
+      <section id="next-up"></section>
+
+      <section class="toolbar">
+        <div class="filters" id="filters" role="tablist"></div>
+        <input type="search" id="search" placeholder="Buscar en los posts…" aria-label="Buscar" />
+      </section>
+
+      <section id="weeks"></section>
+    </main>
+
+    <dialog id="publish-dialog">
+      <form method="dialog" class="dialog-body">
+        <h2>¿Publicaste el post?</h2>
+        <p>Copiamos el texto al portapapeles y abrimos LinkedIn. Si el editor no aparece con el texto, pégalo con <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd>.</p>
+        <label class="field">
+          Enlace del post (opcional)
+          <input type="url" id="publish-url" placeholder="https://www.linkedin.com/posts/…" />
+        </label>
+        <div class="dialog-actions">
+          <button class="btn ghost" value="cancel">Todavía no</button>
+          <button class="btn primary" value="confirm">Sí, marcar como publicado</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
