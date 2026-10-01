@@ -32,6 +32,15 @@ Necesitas: una cuenta de [Supabase](https://supabase.com) (gratis), una de [Verc
    crea una cuenta, verifica tu dominio o usa su dominio de pruebas, crea una API key y copia
    en Supabase los datos SMTP que te da Resend (host `smtp.resend.com`, puerto `465`, usuario `resend`,
    contraseña = la API key).
+5. **Código en el email** (para entrar escribiendo un código, aunque el enlace falle):
+   en **Authentication → Emails → Templates**, edita **Magic Link** y también **Confirm signup**
+   e **Invite user**, y añade esta línea al cuerpo (sin quitar el enlace):
+
+   ```html
+   <p>O escribe este código en Posty: <strong>{{ .Token }}</strong></p>
+   ```
+
+   Guarda cada plantilla.
 
 ## 3. Copiar las claves de Supabase
 
@@ -64,7 +73,11 @@ La clave *service_role* salta las reglas de seguridad: **solo va en Vercel**, nu
 ## 5. Invitar a las personas
 
 En Supabase → **Authentication → Users → Invite user** y escribe el email de cada persona (tú incluido).
-Cada una recibe un email; desde ahí, o desde la pantalla de Posty ("Enviarme el enlace"), entra sin contraseña.
+Cada una recibe un email; desde ahí, o desde la pantalla de Posty (escribe su email → "Continuar"), entra sin contraseña
+con el enlace o con el código del email.
+
+**Si el enlace abre una página que no carga (por ejemplo `localhost:3000`)**: la *Site URL* y las
+*Redirect URLs* del paso 2.3 no tienen la dirección de Vercel. Mientras tanto, el código del email funciona igual.
 
 Para quitar el acceso a alguien: **Authentication → Users → ⋯ → Delete user** (borra también sus datos).
 

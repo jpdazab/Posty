@@ -221,19 +221,39 @@ export async function initBackend() {
   return backend;
 }
 
-// Envía el enlace de acceso. Solo funciona para emails invitados (no crea cuentas nuevas).
+// Envía el email de acceso (enlace + código). Solo funciona para emails invitados (no crea cuentas nuevas).
 export async function sendMagicLink(email) {
   const { error } = await supabaseClient().auth.signInWithOtp({
     email,
     options: { shouldCreateUser: false, emailRedirectTo: `${location.origin}${location.pathname}` },
   });
-  if (error) {
-    if (/signups not allowed|not found|user/i.test(error.message)) {
-      throw new Error('Este email no tiene acceso a Posty. Pide una invitación a quien administra la plataforma.');
-    }
-    if (/rate limit|security purposes/i.test(error.message)) {
-      throw new Error('Has pedido varios enlaces seguidos. Espera un minuto y vuelve a intentarlo.');
-    }
-    throw new Error(error.message);
+  if (!error) return;
+  const text = `${error.code || ''} ${error.message || ''}`;
+  if (/signups? not allowed|otp_disabled|user_not_found|user not found/i.test(text)) {
+    throw new Error('Este email no tiene acceso a Posty. Pide una invitación a quien administra la plataforma.');
   }
+  if (/rate limit|security purposes|over_email_send_rate_limit/i.test(text)) {
+    throw new Error('Has pedido varios emails seguidos. Espera un minuto y vuelve a intentarlo.');
+  }
+  if (/error sending|smtp/i.test(text)) {
+    throw new Error('No se pudo enviar el email. Revisa la configuración de email (SMTP) en Supabase.');
+  }
+  throw new Error(error.message);
+}
+
+// Entra con el código de 6 dígitos que llega en el mismo email (sirve aunque el enlace falle).
+export async function verifyEmailCode(email, code) {
+  const { data, error } = await supabaseClient().auth.verifyOtp({ email, token: code, type: 'email' });
+  if (error || !data.session) {
+    const text = `${error?.code || ''} ${error?.message || ''}`;
+    if (/expired|invalid|otp/i.test(text)) throw new Error('El código no es válido o caducó. Revisa el último email o pide uno nuevo.');
+    throw new Error(error?.message || 'No se pudo entrar. Inténtalo de nuevo.');
+  }
+}
+
+// Avisa cuando se inicia sesión (también si el enlace se abrió en otra pestaña del mismo navegador).
+export function onSignedIn(callback) {
+  supabaseClient().auth.onAuthStateChange((event, session) => {
+    if (session && event === 'SIGNED_IN') callback();
+  });
 }

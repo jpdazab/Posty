@@ -1,8 +1,9 @@
 // Página de acceso (modo cuentas): el usuario escribe su email y recibe un enlace para entrar.
+// El email trae un enlace y un código: se entra con cualquiera de los dos.
 // Solo funciona con emails invitados desde Supabase (aquí no se pueden crear cuentas).
 
 import { $, esc } from './ui.js';
-import { sendMagicLink } from './backend.js';
+import { onSignedIn, sendMagicLink, verifyEmailCode } from './backend.js';
 
 const EMAIL_KEY = 'posty:last-email';
 const RESEND_SECONDS = 60;
@@ -20,7 +21,7 @@ const urlError = (() => {
   return 'No se pudo entrar con ese enlace. Pide uno nuevo.';
 })();
 
-const state = { step: 'form', email: '', error: urlError, sending: false, cooldown: 0 };
+const state = { step: 'form', email: '', error: urlError, sending: false, verifying: false, cooldown: 0 };
 let timer;
 
 function rememberedEmail() {
@@ -40,26 +41,34 @@ function render() {
           <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z M4 7l8 6 8-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
         </span>
         <h2>Revisa tu email</h2>
-        <p>Te enviamos un enlace a <strong>${esc(state.email)}</strong>. Ábrelo para entrar en Posty. Si no lo ves en unos minutos, mira en spam.</p>
+        <p>Te enviamos un email a <strong>${esc(state.email)}</strong>. Abre el enlace o escribe aquí el código que trae. Si no lo ves en unos minutos, mira en spam.</p>
+        <form class="login-code" id="login-code" novalidate>
+          <label class="field">
+            Código
+            <input id="login-code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456" />
+          </label>
+          <button class="btn primary" type="submit" ${state.verifying ? 'disabled' : ''}>${state.verifying ? 'Entrando…' : 'Entrar'}</button>
+        </form>
+        <p class="login-msg error" role="alert">${state.error ? esc(state.error) : ''}</p>
         <div class="login-actions">
           <button class="btn ghost" data-login-action="resend" ${state.cooldown || state.sending ? 'disabled' : ''}>
-            ${state.sending ? 'Enviando…' : state.cooldown ? `Reenviar en ${state.cooldown} s` : 'Reenviar el enlace'}
+            ${state.sending ? 'Enviando…' : state.cooldown ? `Reenviar en ${state.cooldown} s` : 'Reenviar el email'}
           </button>
           <button class="link" data-login-action="change">Usar otro email</button>
         </div>
-        <p class="login-msg error" role="alert">${state.error ? esc(state.error) : ''}</p>
       </div>`;
+    $('#login-code-input').focus();
     return;
   }
   root.querySelector('.login-panel').innerHTML = `
     <form class="login-form" id="login-form" novalidate>
       <h2>Entrar</h2>
-      <p class="muted">Te enviamos un enlace por email para entrar, sin contraseña.</p>
+      <p class="muted">Te enviamos un email con un enlace y un código para entrar, sin contraseña.</p>
       <label class="field">
         Email
         <input type="email" id="login-email" autocomplete="email" inputmode="email" required placeholder="tu@email.com" value="${esc(state.email || rememberedEmail())}" />
       </label>
-      <button class="btn primary" type="submit" ${state.sending ? 'disabled' : ''}>${state.sending ? 'Enviando…' : 'Enviarme el enlace'}</button>
+      <button class="btn primary" type="submit" ${state.sending ? 'disabled' : ''}>${state.sending ? 'Enviando…' : 'Continuar'}</button>
       <p class="login-msg error" id="login-msg" role="alert">${state.error ? esc(state.error) : ''}</p>
       <p class="muted small">¿Aún no tienes acceso? Pide una invitación a quien administra Posty.</p>
     </form>`;
@@ -97,6 +106,21 @@ async function send(email) {
   render();
 }
 
+async function verify(code) {
+  state.verifying = true;
+  state.error = null;
+  render();
+  try {
+    await verifyEmailCode(state.email, code);
+    location.reload();
+    return;
+  } catch (err) {
+    state.error = err.message;
+  }
+  state.verifying = false;
+  render();
+}
+
 export function showLogin() {
   document.body.classList.remove('loading');
   document.body.classList.add('logged-out');
@@ -117,7 +141,21 @@ export function showLogin() {
     <section class="login-panel" aria-live="polite"></section>`;
   document.body.appendChild(root);
 
+  // Si el enlace se abre en otra pestaña de este navegador, esta pestaña entra sola.
+  onSignedIn(() => location.reload());
+
   root.addEventListener('submit', (e) => {
+    if (e.target.id === 'login-code') {
+      e.preventDefault();
+      const code = $('#login-code-input').value.replace(/\s/g, '');
+      if (!/^\d{6,10}$/.test(code)) {
+        state.error = 'Escribe el código de números que llegó en el email.';
+        render();
+        return;
+      }
+      verify(code);
+      return;
+    }
     if (e.target.id !== 'login-form') return;
     e.preventDefault();
     const email = $('#login-email').value.trim();
