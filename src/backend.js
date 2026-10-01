@@ -103,8 +103,15 @@ export function cloudBackend(client, user) {
   const kitPath = (id) => `${uid}/kit/${id}`;
   const weekDir = (week) => `${uid}/weeks/${week}`;
   const check = ({ data, error }) => {
-    if (error) throw new Error(error.message || 'Error de Supabase');
-    return data;
+    if (!error) return data;
+    // Falta parte del esquema en Supabase: el mensaje dice qué hacer en vez del error técnico.
+    if (/bucket not found/i.test(error.message)) {
+      throw new Error('Falta la carpeta de archivos "assets" en Supabase. Ejecuta supabase/schema.sql en el SQL Editor (ver SETUP.md).');
+    }
+    if (/relation .* does not exist|could not find the table/i.test(error.message)) {
+      throw new Error('Falta una tabla en Supabase. Vuelve a ejecutar supabase/schema.sql completo en el SQL Editor (ver SETUP.md).');
+    }
+    throw new Error(error.message || 'Error de Supabase');
   };
 
   return {
