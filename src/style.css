@@ -292,7 +292,7 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); }
   display: grid; place-items: center; flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
   background: #d97757; color: #fff; font-size: 0.95rem;
 }
-.format-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.format-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
 .format-option {
   display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left;
   padding: 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface);
@@ -327,6 +327,25 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); }
 }
 .history-item:hover { border-color: var(--brand); }
 .history-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+
+/* ---------- Modos, historial y barra de edición ---------- */
+.mode-switch { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.composer-note { margin: 4px 2px 8px; color: var(--muted); }
+.thumb-slide i { width: 44px; background: #0004EB; border-color: #0004EB; }
+.history-row { display: flex; gap: 6px; align-items: stretch; }
+.history-row .history-item { flex: 1; min-width: 0; }
+.icon-btn {
+  display: grid; place-items: center; width: 42px; flex-shrink: 0; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer;
+}
+.icon-btn svg { width: 18px; height: 18px; }
+.icon-btn:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+.icon-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.edit-bar {
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: -16px -18px 0; padding: 12px 18px; background: var(--surface); border-bottom: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
 
 /* ---------- Editor de posts ---------- */
 .gen-editing { padding-bottom: 20px; }
@@ -400,4 +419,6 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); }
   .nav-item { padding: 8px; gap: 6px; font-size: 0.85rem; }
   .nav .nav-item svg { display: none; }
   .format-options { grid-template-columns: 1fr; }
+  .edit-bar { margin: -14px -14px 0; padding: 10px 14px; top: 57px; }
+  .edit-bar strong { display: none; }
 }

@@ -1,10 +1,12 @@
-// Página "Crear post". Dos caminos:
-// - Con Claude: describes el post, eliges carrusel o card y /api/generate devuelve texto y gráfica.
-// - "Escribirlo yo": eliges formato y rellenas el texto y la gráfica a mano.
-// En ambos casos la gráfica se dibuja con el design system jpdazab y se puede editar con vista previa.
+// Página "Crear post". Tres caminos:
+// - Pedir a Claude: describes el post, eliges formato y /api/generate devuelve texto y gráfica.
+// - Pegar mi texto: pegas un post ya escrito y Posty reparte el texto en la gráfica (sin IA).
+// - Desde cero: eliges formato y rellenas el texto y la gráfica a mano.
+// La gráfica se dibuja con el design system jpdazab y se edita con vista previa en vivo.
 
 import { composePost, linkedInShareUrl, LINKEDIN_MAX_CHARS } from './parser.js';
 import { $, esc, toast, copy, linkedinIcon } from './ui.js';
+import { postFromText } from './autolayout.js';
 import {
   normalizePost,
   emptyVisual,
@@ -22,9 +24,25 @@ const HISTORY_KEY = 'posty:created:v1';
 const CODE_KEY = 'posty:access-code';
 const MAX_HISTORY = 20;
 
-const FORMAT_LABELS = { carousel: 'Carrusel', card: 'Card' };
+const FORMAT_LABELS = { carousel: 'Carrusel', card: 'Card', slide: 'Card única (carrusel)' };
 const TONE_LABELS = { blue: 'Azul', ink: 'Negro', grey: 'Gris', yellow: 'Amarillo' };
-const VISUAL_LABELS = { none: 'Sin gráfico', stats: 'Cifras', bars: 'Barras', venn: 'Venn' };
+const VISUAL_LABELS = { none: 'Sin gráfico', stats: 'Cifras', bars: 'Barras', venn: 'Venn', image: 'Imagen' };
+
+const MODES = {
+  ai: {
+    label: 'Pedir a Claude',
+    placeholder: 'Cuéntale a Claude de qué quieres hablar: una idea, una anécdota, una charla, un dato…',
+    submit: 'Generar con Claude →',
+    user: (s) => esc(s.prompt),
+  },
+  paste: {
+    label: 'Pegar mi texto',
+    placeholder: 'Pega aquí el texto de tu post. Posty usará la primera línea como titular, las listas y cifras para la gráfica y la pregunta final para cerrar.',
+    submit: 'Crear diseño →',
+    user: (s) => `<span class="muted small">Texto pegado</span><br>${esc(s.prompt.length > 220 ? `${s.prompt.slice(0, 220)}…` : s.prompt)}`,
+  },
+  manual: { label: 'Desde cero', submit: 'Elegir formato →', user: () => 'Quiero escribirlo desde cero' },
+};
 
 const SUGGESTIONS = [
   'Lo que aprendí liderando un equipo de diseño en una scale-up',
@@ -34,12 +52,14 @@ const SUGGESTIONS = [
 
 const state = {
   step: 'prompt', // prompt → format → loading → result | error
-  mode: 'ai', // ai | manual
+  mode: 'ai', // ai | paste | manual
   prompt: '',
   format: null,
   result: null,
   error: null,
   editing: false,
+  snapshot: null, // copia del post al entrar a editar, para "Volver sin guardar"
+  isNew: false, // post todavía no guardado (pegado o desde cero)
   needsCode: false,
 };
 
@@ -57,19 +77,33 @@ function readStorage(key, fallback) {
 function writeStorage(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    return true;
   } catch {
-    // Sin almacenamiento disponible: el historial vive solo en esta pestaña.
+    return false;
   }
 }
 
 let history = readStorage(HISTORY_KEY, []);
 
+function persistHistory() {
+  if (!writeStorage(HISTORY_KEY, history)) {
+    toast('No hay espacio en el navegador: borra posts antiguos o usa imágenes más ligeras');
+  }
+}
+
 function saveToHistory(post) {
   history = [post, ...history.filter((p) => p.id !== post.id)].slice(0, MAX_HISTORY);
-  writeStorage(HISTORY_KEY, history);
+  persistHistory();
+}
+
+function deleteFromHistory(id) {
+  history = history.filter((p) => p.id !== id);
+  persistHistory();
 }
 
 // ---------- Utilidades ----------
+
+const clone = (value) => JSON.parse(JSON.stringify(value));
 
 function finalText(post) {
   return composePost(post.text, (post.hashtags || []).join(' '));
@@ -87,13 +121,26 @@ function slug(text) {
   );
 }
 
+function newMeta(extra = {}) {
+  return { id: `post-${Date.now()}`, createdAt: new Date().toISOString(), prompt: '', ...extra };
+}
+
 function blankPost(format) {
-  const base = { id: `post-${Date.now()}`, format, title: '', text: '', hashtags: [], createdAt: new Date().toISOString(), prompt: '' };
+  const base = { ...newMeta(), format, text: '', hashtags: [] };
   if (format === 'card') {
     return normalizePost({
       ...base,
       title: 'Nueva card',
       card: { headline: 'Tu titular con una frase destacada', highlight: 'frase destacada', lead: 'Una línea de apoyo.', items: [{ title: 'Primer punto', description: 'Una idea en una o dos líneas.' }] },
+    });
+  }
+  if (format === 'slide') {
+    return normalizePost({
+      ...base,
+      title: 'Nueva card única',
+      style: 'slide',
+      cover: { tone: 'blue', tag: 'ux', title: 'Tu titular', underline: '', summary: 'Una línea de apoyo.' },
+      slide: { tag: 'ux', title: 'Tu titular', titleAccent: 'en dos lineas', summary: 'Explica la idea en una o dos frases.', visual: emptyVisual() },
     });
   }
   return normalizePost({
@@ -133,6 +180,28 @@ function visualLines(items) {
   return (items || []).map((it) => `${it.display || it.value}${it.label ? ` | ${it.label}` : ''}`).join('\n');
 }
 
+// Reduce la imagen (máx. 1400 px de ancho) y la guarda como JPEG para no llenar el navegador.
+function readImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 1400 / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('No se pudo leer la imagen'));
+    };
+    img.src = url;
+  });
+}
+
 // ---------- Render ----------
 
 function bubble(role, content) {
@@ -140,18 +209,30 @@ function bubble(role, content) {
 }
 
 function renderComposer() {
+  const mode = MODES[state.mode];
   return `
+    <div class="mode-switch" role="tablist" aria-label="Cómo quieres crear el post">
+      ${Object.entries(MODES)
+        .map(([key, m]) => `<button role="tab" class="chip ${state.mode === key ? 'active' : ''}" aria-selected="${state.mode === key}" data-create-action="mode" data-mode="${key}">${m.label}</button>`)
+        .join('')}
+    </div>
     <form class="composer" id="create-form">
-      <label for="create-prompt" class="sr-only">¿Sobre qué quieres publicar?</label>
-      <textarea id="create-prompt" rows="4" placeholder="Cuéntale a Claude de qué quieres hablar: una idea, una anécdota, una charla, un dato…">${esc(state.prompt)}</textarea>
+      ${
+        state.mode === 'manual'
+          ? '<p class="composer-note">Elige el formato y rellena el texto y la gráfica en el editor, con vista previa en vivo.</p>'
+          : `<label for="create-prompt" class="sr-only">${esc(mode.label)}</label>
+             <textarea id="create-prompt" rows="${state.mode === 'paste' ? 9 : 4}" placeholder="${esc(mode.placeholder)}">${esc(state.prompt)}</textarea>`
+      }
       <div class="composer-foot">
-        <button class="btn ghost" type="button" data-create-action="manual">✎ Escribirlo yo</button>
-        <button class="btn primary" type="submit">Generar con Claude →</button>
+        <span class="muted small">${state.mode === 'ai' ? 'Enter para enviar · Shift+Enter para salto de línea' : state.mode === 'paste' ? 'Sin IA: después puedes ajustar todo en el editor.' : ''}</span>
+        <button class="btn primary" type="submit">${mode.submit}</button>
       </div>
     </form>
-    <div class="suggestions">
-      ${SUGGESTIONS.map((s) => `<button class="chip" type="button" data-create-action="suggest" data-text="${esc(s)}">${esc(s)}</button>`).join('')}
-    </div>`;
+    ${
+      state.mode === 'ai'
+        ? `<div class="suggestions">${SUGGESTIONS.map((s) => `<button class="chip" type="button" data-create-action="suggest" data-text="${esc(s)}">${esc(s)}</button>`).join('')}</div>`
+        : ''
+    }`;
 }
 
 function renderFormatQuestion() {
@@ -164,10 +245,15 @@ function renderFormatQuestion() {
          <strong>Carrusel</strong>
          <span>Portada y slides para subir como PDF</span>
        </button>
+       <button class="format-option" data-create-action="format" data-format="slide">
+         <span class="format-thumb thumb-slide" aria-hidden="true"><i></i></span>
+         <strong>Card única</strong>
+         <span>Una sola slide del carrusel: portada, cifras o imagen</span>
+       </button>
        <button class="format-option" data-create-action="format" data-format="card">
          <span class="format-thumb thumb-card" aria-hidden="true"><i></i></span>
-         <strong>Card</strong>
-         <span>Una imagen con titular y lista numerada</span>
+         <strong>Card con lista</strong>
+         <span>Titular y lista numerada</span>
        </button>
      </div>`,
   );
@@ -186,6 +272,59 @@ function field(label, path, { multiline = false, blackbird = false, hint = '' } 
       <small class="ed-warn" data-warn="${path}" ${warn ? '' : 'hidden'}>Esta fuente no tiene tildes, ñ ni ¿¡: cambia esas letras o esas palabras.</small>
       ${hint ? `<small class="muted">${esc(hint)}</small>` : ''}
     </label>`;
+}
+
+function select(label, path, options) {
+  const value = getPath(state.result, path);
+  return `
+    <label class="ed-field"><span>${esc(label)}</span>
+      <select data-field="${path}">${Object.entries(options)
+        .map(([k, l]) => `<option value="${k}" ${value === k ? 'selected' : ''}>${esc(l)}</option>`)
+        .join('')}</select>
+    </label>`;
+}
+
+function coverFields(prefix) {
+  const cover = getPath(state.result, prefix);
+  return `
+    ${select('Color', `${prefix}.tone`, Object.fromEntries(COVER_TONES.map((t) => [t, TONE_LABELS[t]])))}
+    ${field('Etiqueta', `${prefix}.tag`, { blackbird: true })}
+    ${field('Titular', `${prefix}.title`, { blackbird: true, multiline: true, hint: 'Máximo tres líneas.' })}
+    ${field('Palabra subrayada', `${prefix}.underline`, { hint: 'Opcional: una palabra del titular.' })}
+    ${cover.tone === 'yellow' ? '' : field('Resumen', `${prefix}.summary`, { multiline: true })}`;
+}
+
+function slideFields(prefix, dataIndex) {
+  const slide = getPath(state.result, prefix);
+  const v = slide.visual;
+  return `
+    ${field('Etiqueta', `${prefix}.tag`, { blackbird: true })}
+    ${field('Título, línea 1', `${prefix}.title`, { blackbird: true })}
+    ${field('Título, línea 2 (azul)', `${prefix}.titleAccent`, { blackbird: true })}
+    ${field('Resumen', `${prefix}.summary`, { multiline: true, hint: 'Máximo tres líneas.' })}
+    ${select('Gráfico', `${prefix}.visual.kind`, VISUAL_LABELS)}
+    ${
+      v.kind === 'stats' || v.kind === 'bars'
+        ? `<label class="ed-field"><span>${v.kind === 'stats' ? 'Cifras' : 'Barras'} <em class="bb">una por línea</em></span>
+             <textarea data-visual-lines="${prefix}" rows="3" placeholder="${v.kind === 'stats' ? '48% | equipos con IA' : '72 | Research'}">${esc(visualLines(v.items))}</textarea>
+             <small class="muted">${v.kind === 'stats' ? 'Valor | etiqueta (la etiqueta va en Blackbird).' : 'Valor de 0 a 100 | etiqueta.'}</small>
+           </label>`
+        : ''
+    }
+    ${
+      v.kind === 'venn'
+        ? `${field('Círculo izquierdo', `${prefix}.visual.left`, { blackbird: true })}${field('Cruce', `${prefix}.visual.overlap`, { blackbird: true })}${field('Círculo derecho', `${prefix}.visual.right`, { blackbird: true })}`
+        : ''
+    }
+    ${
+      v.kind === 'image'
+        ? `<label class="ed-field"><span>Imagen</span>
+             <input type="file" accept="image/*" data-image="${prefix}" data-index="${dataIndex ?? ''}" />
+             <small class="muted">${v.src ? 'Imagen cargada. Elige otra para reemplazarla.' : 'Se recorta para llenar el hueco de 991 × 637.'}</small>
+           </label>
+           ${field('Descripción de la imagen', `${prefix}.visual.alt`, { hint: 'Texto alternativo, para accesibilidad.' })}`
+        : ''
+    }`;
 }
 
 function renderGraphicEditor(post) {
@@ -210,45 +349,27 @@ function renderGraphicEditor(post) {
       </fieldset>`;
   }
 
+  if (post.format === 'slide') {
+    return `
+      <fieldset class="ed-group">
+        <legend>Card única</legend>
+        ${select('Estilo', 'style', { slide: 'Slide (título, resumen y gráfico o imagen)', cover: 'Portada (titular grande a color)' })}
+        ${post.style === 'cover' ? coverFields('cover') : slideFields('slide')}
+      </fieldset>`;
+  }
+
   return `
     <fieldset class="ed-group">
       <legend>Portada</legend>
-      <label class="ed-field"><span>Color</span>
-        <select data-field="cover.tone">${COVER_TONES.map((t) => `<option value="${t}" ${post.cover.tone === t ? 'selected' : ''}>${TONE_LABELS[t]}</option>`).join('')}</select>
-      </label>
-      ${field('Etiqueta', 'cover.tag', { blackbird: true })}
-      ${field('Titular', 'cover.title', { blackbird: true, multiline: true, hint: 'Máximo tres líneas.' })}
-      ${field('Palabra subrayada', 'cover.underline', { hint: 'Opcional: una palabra del titular.' })}
-      ${post.cover.tone === 'yellow' ? '' : field('Resumen', 'cover.summary', { multiline: true })}
+      ${coverFields('cover')}
     </fieldset>
     ${post.slides
       .map(
-        (s, i) => `
+        (_, i) => `
       <fieldset class="ed-group">
         <legend>Slide ${i + 2}</legend>
         <div class="ed-item-head"><span></span><button class="link danger" data-create-action="remove-slide" data-index="${i}">Quitar slide</button></div>
-        ${field('Etiqueta', `slides.${i}.tag`, { blackbird: true })}
-        ${field('Título, línea 1', `slides.${i}.title`, { blackbird: true })}
-        ${field('Título, línea 2 (azul)', `slides.${i}.titleAccent`, { blackbird: true })}
-        ${field('Resumen', `slides.${i}.summary`, { multiline: true, hint: 'Máximo tres líneas.' })}
-        <label class="ed-field"><span>Gráfico</span>
-          <select data-field="slides.${i}.visual.kind">${Object.entries(VISUAL_LABELS)
-            .map(([k, label]) => `<option value="${k}" ${s.visual.kind === k ? 'selected' : ''}>${label}</option>`)
-            .join('')}</select>
-        </label>
-        ${
-          s.visual.kind === 'stats' || s.visual.kind === 'bars'
-            ? `<label class="ed-field"><span>${s.visual.kind === 'stats' ? 'Cifras' : 'Barras'} <em class="bb">una por línea</em></span>
-                 <textarea data-visual-lines="${i}" rows="3" placeholder="${s.visual.kind === 'stats' ? '48% | equipos con IA' : '72 | Research'}">${esc(visualLines(s.visual.items))}</textarea>
-                 <small class="muted">${s.visual.kind === 'stats' ? 'Valor | etiqueta (la etiqueta va en Blackbird).' : 'Valor de 0 a 100 | etiqueta.'}</small>
-               </label>`
-            : ''
-        }
-        ${
-          s.visual.kind === 'venn'
-            ? `${field('Círculo izquierdo', `slides.${i}.visual.left`, { blackbird: true })}${field('Cruce', `slides.${i}.visual.overlap`, { blackbird: true })}${field('Círculo derecho', `slides.${i}.visual.right`, { blackbird: true })}`
-            : ''
-        }
+        ${slideFields(`slides.${i}`, i)}
       </fieldset>`,
       )
       .join('')}
@@ -265,12 +386,11 @@ function renderEditor(post) {
         <label class="ed-field"><span>Hashtags</span><input type="text" data-hashtags value="${esc(post.hashtags.join(' '))}" placeholder="#ProductDesign #UX" /></label>
       </fieldset>
       ${renderGraphicEditor(post)}
-      <div class="actions start"><button class="btn primary" data-create-action="done-edit">Listo</button></div>
     </div>`;
 }
 
 function renderPreview(post) {
-  const count = post.format === 'card' ? 1 : 1 + post.slides.length;
+  const count = post.format === 'carousel' ? 1 + post.slides.length : 1;
   const frames = Array.from({ length: count }, () => frameHtml(post.format));
   return post.format === 'carousel'
     ? `<div class="gen-gallery">${frames.map((f) => `<div class="gen-slide">${f}</div>`).join('')}</div>`
@@ -285,11 +405,16 @@ function renderResult(post) {
   if (state.editing) {
     return `
       <article class="post gen-post gen-editing status-aprobado">
-        <div class="post-head"><h3>Editar ${FORMAT_LABELS[post.format].toLowerCase()}</h3><span class="badge badge-aprobado">Vista previa en vivo</span></div>
+        <div class="edit-bar">
+          <button class="btn ghost small" data-create-action="cancel-edit">← Volver sin guardar</button>
+          <strong>Editar ${FORMAT_LABELS[post.format].toLowerCase()}</strong>
+          <button class="btn primary small" data-create-action="done-edit">Guardar</button>
+        </div>
         <div class="edit-layout">${renderEditor(post)}<div class="edit-preview">${preview}</div></div>
       </article>`;
   }
 
+  const canRegenerate = state.mode === 'ai' && state.prompt;
   return `
     <article class="post gen-post status-aprobado">
       <div class="post-head">
@@ -307,21 +432,24 @@ function renderResult(post) {
           <button class="btn ghost" data-create-action="edit">Editar</button>
           <button class="btn ghost" data-create-action="png">⬇ ${post.format === 'carousel' ? 'PNGs' : 'PNG'}</button>
           ${post.format === 'carousel' ? '<button class="btn ghost" data-create-action="pdf">⬇ PDF</button>' : ''}
+          <button class="btn ghost danger" data-create-action="delete" data-id="${esc(post.id)}">Borrar</button>
         </div>
       </div>
     </article>
     <div class="gen-next">
-      ${state.mode === 'ai' && state.prompt ? '<button class="btn ghost" data-create-action="regenerate">↻ Generar otra versión</button>' : ''}
-      ${state.mode === 'ai' && state.prompt ? `<button class="btn ghost" data-create-action="switch-format">Probar como ${post.format === 'carousel' ? 'card' : 'carrusel'}</button>` : ''}
+      ${canRegenerate ? '<button class="btn ghost" data-create-action="regenerate">↻ Generar otra versión</button>' : ''}
+      ${['carousel', 'card', 'slide']
+        .filter((f) => f !== post.format)
+        .map((f) => `<button class="btn ghost" data-create-action="switch-format" data-format="${f}">Probar como ${FORMAT_LABELS[f].toLowerCase()}</button>`)
+        .join('')}
       <button class="btn ghost" data-create-action="new">+ Nuevo post</button>
     </div>`;
 }
 
 function renderConversation() {
   if (state.step === 'prompt') return renderComposer();
-  const parts = [];
+  const parts = [bubble('user', `<p>${MODES[state.mode].user(state)}</p>`)];
 
-  parts.push(bubble('user', `<p>${state.mode === 'manual' ? 'Quiero escribirlo yo' : esc(state.prompt)}</p>`));
   if (state.step === 'format') {
     parts.push(renderFormatQuestion());
     parts.push(`<div class="gen-next"><button class="btn ghost" data-create-action="back">← Volver</button></div>`);
@@ -332,12 +460,7 @@ function renderConversation() {
   parts.push(bubble('user', `<p>${FORMAT_LABELS[state.format]}</p>`));
 
   if (state.step === 'loading') {
-    parts.push(
-      bubble(
-        'assistant',
-        `<p class="typing"><span></span><span></span><span></span> Escribiendo tu ${state.format === 'carousel' ? 'carrusel' : 'card'}… suele tardar entre 20 y 60 segundos.</p>`,
-      ),
-    );
+    parts.push(bubble('assistant', `<p class="typing"><span></span><span></span><span></span> Escribiendo tu post… suele tardar entre 20 y 60 segundos.</p>`));
   } else if (state.step === 'error') {
     parts.push(
       bubble(
@@ -346,18 +469,18 @@ function renderConversation() {
          ${state.needsCode ? renderCodeForm() : ''}
          <div class="actions start">
            <button class="btn primary" data-create-action="retry">Reintentar</button>
-           <button class="btn ghost" data-create-action="manual-from-error">Escribirlo yo</button>
+           <button class="btn ghost" data-create-action="paste-from-error">Usar mi texto sin IA</button>
            <button class="btn ghost" data-create-action="back">Cambiar la petición</button>
          </div>`,
       ),
     );
   } else if (state.step === 'result') {
-    parts.push(
-      bubble(
-        'assistant',
-        `<p>${state.mode === 'manual' ? 'Rellena el texto y la gráfica. La vista previa se actualiza mientras escribes.' : 'Aquí lo tienes. Puedes editar el texto y la gráfica, descargarla y publicarlo.'}</p>`,
-      ),
-    );
+    const intro = {
+      ai: 'Aquí lo tienes. Puedes editar el texto y la gráfica, descargarla y publicarlo.',
+      paste: 'He repartido tu texto en la gráfica. Revisa los campos: la vista previa se actualiza mientras escribes.',
+      manual: 'Rellena el texto y la gráfica. La vista previa se actualiza mientras escribes.',
+    }[state.mode];
+    parts.push(bubble('assistant', `<p>${intro}</p>`));
     parts.push(renderResult(state.result));
   }
   return parts.join('');
@@ -379,11 +502,14 @@ function renderHistory() {
       ${history
         .map(
           (p) => `
-        <li>
+        <li class="history-row">
           <button class="history-item" data-create-action="open" data-id="${esc(p.id)}">
-            <span class="badge badge-pendiente">${FORMAT_LABELS[p.format]}</span>
+            <span class="badge badge-pendiente">${FORMAT_LABELS[p.format] || p.format}</span>
             <span class="history-title">${esc(p.title || 'Sin título')}</span>
             <span class="muted small">${esc(new Date(p.createdAt).toLocaleDateString('es', { day: 'numeric', month: 'short' }))}</span>
+          </button>
+          <button class="icon-btn" data-create-action="delete" data-id="${esc(p.id)}" aria-label="Borrar ${esc(p.title || 'post')}" title="Borrar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
         </li>`,
         )
@@ -402,7 +528,7 @@ export function renderCreate() {
   root.innerHTML = `
     <header class="page-head">
       <h1>Crear post</h1>
-      <p class="muted">Pide a Claude un post o escríbelo tú. La gráfica sale con tu design system, lista para LinkedIn.</p>
+      <p class="muted">Pide un post a Claude, pega tu texto o empieza desde cero. La gráfica sale con tu design system, lista para LinkedIn.</p>
     </header>
     <section class="conversation" aria-live="polite">${renderConversation()}</section>
     ${state.step === 'prompt' ? renderHistory() : ''}`;
@@ -410,24 +536,25 @@ export function renderCreate() {
   if (state.step === 'prompt') $('#create-prompt')?.focus();
 }
 
-// Vuelve a dibujar solo el editor + vista previa (p. ej. al añadir un punto) sin perder el resto.
-function rerenderResult() {
-  renderCreate();
-}
-
 let previewTimer;
 function schedulePreview() {
   clearTimeout(previewTimer);
-  previewTimer = setTimeout(() => {
-    mountPreview();
-    saveToHistory(state.result);
-  }, 120);
+  previewTimer = setTimeout(mountPreview, 120);
 }
 
 // ---------- Acciones ----------
 
+function showResult(post, { editing = false, isNew = false } = {}) {
+  state.result = post;
+  state.format = post.format;
+  state.step = 'result';
+  state.editing = editing;
+  state.isNew = isNew;
+  state.snapshot = editing ? clone(post) : null;
+  renderCreate();
+}
+
 async function generate() {
-  state.mode = 'ai';
   state.step = 'loading';
   state.error = null;
   state.editing = false;
@@ -443,26 +570,31 @@ async function generate() {
       state.needsCode = res.status === 401;
       throw new Error(
         data.error ||
-          (res.status === 404 ? 'El generador con Claude solo funciona con la web desplegada en Vercel.' : 'No se pudo generar el post.'),
+          (res.status === 404 ? 'El generador con Claude solo funciona con la web desplegada en Vercel y una API key configurada.' : 'No se pudo generar el post.'),
       );
     }
-    state.result = normalizePost({ ...data, id: `gen-${Date.now()}`, prompt: state.prompt, createdAt: new Date().toISOString() });
-    saveToHistory(state.result);
-    state.step = 'result';
+    const post = normalizePost({ ...data, ...newMeta({ prompt: state.prompt }) });
+    saveToHistory(post);
+    showResult(post);
   } catch (err) {
     state.error = err.message === 'Failed to fetch' ? 'No hay conexión con el servidor.' : err.message;
     state.step = 'error';
+    renderCreate();
   }
-  renderCreate();
 }
 
-function startManual(format) {
-  state.mode = 'manual';
+// Crea el post del formato elegido según el modo (pegar texto o desde cero).
+function createLocal(format) {
   state.format = format;
-  state.result = blankPost(format);
-  state.editing = true;
-  state.step = 'result';
-  saveToHistory(state.result);
+  if (state.mode === 'paste') {
+    showResult(normalizePost({ ...postFromText(state.prompt, format), ...newMeta() }), { editing: true, isNew: true });
+  } else {
+    showResult(blankPost(format), { editing: true, isNew: true });
+  }
+}
+
+function resetToStart() {
+  Object.assign(state, { step: 'prompt', prompt: '', format: null, result: null, editing: false, snapshot: null, isNew: false });
   renderCreate();
 }
 
@@ -470,28 +602,26 @@ async function handle(btn) {
   const action = btn.dataset.createAction;
   const post = state.result;
   switch (action) {
+    case 'mode':
+      state.mode = btn.dataset.mode;
+      renderCreate();
+      break;
     case 'suggest':
       $('#create-prompt').value = btn.dataset.text;
       $('#create-prompt').focus();
       break;
-    case 'manual':
-      state.mode = 'manual';
-      state.step = 'format';
-      renderCreate();
-      break;
-    case 'manual-from-error':
-      startManual(state.format);
+    case 'paste-from-error':
+      state.mode = 'paste';
+      createLocal(state.format);
       break;
     case 'format':
-      if (state.mode === 'manual') startManual(btn.dataset.format);
-      else {
+      if (state.mode === 'ai') {
         state.format = btn.dataset.format;
         generate();
-      }
+      } else createLocal(btn.dataset.format);
       break;
     case 'back':
       state.step = 'prompt';
-      state.mode = 'ai';
       renderCreate();
       break;
     case 'retry': {
@@ -503,27 +633,39 @@ async function handle(btn) {
     case 'regenerate':
       generate();
       break;
-    case 'switch-format':
-      state.format = post.format === 'carousel' ? 'card' : 'carousel';
-      generate();
+    case 'switch-format': {
+      const format = btn.dataset.format;
+      if (state.mode === 'ai' && state.prompt) {
+        state.format = format;
+        generate();
+      } else {
+        // Sin IA: rehace la gráfica a partir del texto del post en el nuevo formato.
+        const next = normalizePost({ ...postFromText(post.text + (post.hashtags.length ? `\n\n${post.hashtags.join(' ')}` : ''), format), ...newMeta(), title: post.title });
+        state.mode = 'paste';
+        state.prompt = post.text;
+        showResult(next, { editing: true, isNew: true });
+      }
       break;
+    }
     case 'new':
-      Object.assign(state, { step: 'prompt', mode: 'ai', prompt: '', format: null, result: null, editing: false });
-      renderCreate();
+      resetToStart();
       break;
     case 'open': {
       const found = history.find((p) => p.id === btn.dataset.id);
       if (!found) return;
       const result = normalizePost(found);
-      Object.assign(state, {
-        step: 'result',
-        mode: result.prompt ? 'ai' : 'manual',
-        prompt: result.prompt || '',
-        format: result.format,
-        result,
-        editing: false,
-      });
-      renderCreate();
+      state.mode = result.prompt ? 'ai' : 'manual';
+      state.prompt = result.prompt || '';
+      showResult(result);
+      break;
+    }
+    case 'delete': {
+      const target = history.find((p) => p.id === btn.dataset.id);
+      if (!target || !window.confirm(`¿Borrar "${target.title || 'este post'}"? No se puede deshacer.`)) return;
+      deleteFromHistory(target.id);
+      toast('Post borrado');
+      if (state.result?.id === target.id) resetToStart();
+      else renderCreate();
       break;
     }
     case 'copy':
@@ -536,29 +678,45 @@ async function handle(btn) {
       break;
     case 'edit':
       state.editing = true;
-      rerenderResult();
+      state.snapshot = clone(post);
+      renderCreate();
+      break;
+    case 'cancel-edit':
+      if (state.isNew) {
+        // Nunca se guardó: volver al inicio sin dejar rastro.
+        state.step = 'prompt';
+        state.result = null;
+        state.editing = false;
+        renderCreate();
+      } else {
+        state.result = state.snapshot;
+        state.editing = false;
+        renderCreate();
+        toast('Cambios descartados');
+      }
       break;
     case 'done-edit':
       state.editing = false;
+      state.isNew = false;
       saveToHistory(post);
       toast('Cambios guardados');
-      rerenderResult();
+      renderCreate();
       break;
     case 'add-item':
       post.card.items.push({ title: '', description: '' });
-      rerenderResult();
+      renderCreate();
       break;
     case 'remove-item':
       post.card.items.splice(Number(btn.dataset.index), 1);
-      rerenderResult();
+      renderCreate();
       break;
     case 'add-slide':
       post.slides.push({ tag: '', title: '', titleAccent: '', summary: '', visual: emptyVisual() });
-      rerenderResult();
+      renderCreate();
       break;
     case 'remove-slide':
       post.slides.splice(Number(btn.dataset.index), 1);
-      rerenderResult();
+      renderCreate();
       break;
     case 'png':
     case 'pdf': {
@@ -581,24 +739,35 @@ async function handle(btn) {
 function handleInput(e) {
   const el = e.target;
   const post = state.result;
-  if (!post) return;
+  if (!post || el.type === 'file') return;
   if (el.dataset.field) {
     setPath(post, el.dataset.field, el.value);
     const warn = document.querySelector(`[data-warn="${CSS.escape(el.dataset.field)}"]`);
     if (warn) warn.hidden = !blackbirdIssues(el.value);
-    // Cambiar el tipo de gráfico o el color de portada cambia los campos del formulario.
+    // Cambiar un selector (estilo, color, tipo de gráfico) cambia los campos del formulario.
     if (el.tagName === 'SELECT') {
-      rerenderResult();
+      renderCreate();
       return;
     }
   } else if (el.dataset.hashtags !== undefined) {
     post.hashtags = el.value.split(/[\s,]+/).filter(Boolean).map((t) => (t.startsWith('#') ? t : `#${t}`));
   } else if (el.dataset.visualLines !== undefined) {
-    post.slides[Number(el.dataset.visualLines)].visual.items = parseVisualLines(el.value);
+    getPath(post, el.dataset.visualLines).visual.items = parseVisualLines(el.value);
   } else {
     return;
   }
   schedulePreview();
+}
+
+async function handleImage(e) {
+  const el = e.target;
+  if (el.type !== 'file' || !el.dataset.image || !el.files[0]) return;
+  try {
+    getPath(state.result, el.dataset.image).visual.src = await readImage(el.files[0]);
+    renderCreate();
+  } catch (err) {
+    toast(err.message);
+  }
 }
 
 export function initCreatePage() {
@@ -612,22 +781,24 @@ export function initCreatePage() {
   root.addEventListener('submit', (e) => {
     if (e.target.id !== 'create-form') return;
     e.preventDefault();
-    const text = $('#create-prompt').value.trim();
-    if (!text) {
-      toast('Escribe primero de qué quieres hablar');
-      return;
+    if (state.mode !== 'manual') {
+      const text = $('#create-prompt').value.trim();
+      if (!text) {
+        toast(state.mode === 'paste' ? 'Pega primero el texto de tu post' : 'Escribe primero de qué quieres hablar');
+        return;
+      }
+      state.prompt = text;
     }
-    state.prompt = text;
-    state.mode = 'ai';
     state.step = 'format';
     renderCreate();
   });
   root.addEventListener('keydown', (e) => {
-    if (e.target.id === 'create-prompt' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    if (state.mode === 'ai' && e.target.id === 'create-prompt' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       e.target.form.requestSubmit();
     }
   });
   root.addEventListener('input', handleInput);
+  root.addEventListener('change', handleImage);
   window.addEventListener('resize', () => fitVisuals(root));
 }

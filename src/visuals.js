@@ -11,10 +11,11 @@ const h = React.createElement;
 export const SIZES = {
   card: { w: 1080, h: 1351 },
   carousel: { w: 1231, h: 1731 },
+  slide: { w: 1231, h: 1731 },
 };
 
 export const COVER_TONES = ['blue', 'ink', 'grey', 'yellow'];
-export const VISUAL_KINDS = ['none', 'stats', 'bars', 'venn'];
+export const VISUAL_KINDS = ['none', 'stats', 'bars', 'venn', 'image'];
 
 // Projekt Blackbird no tiene tildes, ñ ni signos de apertura.
 const NO_BLACKBIRD = /[áéíóúüñÁÉÍÓÚÜÑ¿¡]/;
@@ -25,7 +26,7 @@ export function blackbirdIssues(text) {
 // ---------- Normalización (también migra posts creados con la versión anterior) ----------
 
 export function emptyVisual() {
-  return { kind: 'none', items: [], left: '', overlap: '', right: '' };
+  return { kind: 'none', items: [], left: '', overlap: '', right: '', src: '', alt: '' };
 }
 
 export function normalizePost(post) {
@@ -38,6 +39,10 @@ export function normalizePost(post) {
       lead: c.lead || '',
       items: (c.items || []).map((it) => (typeof it === 'string' ? { title: it, description: '' } : { title: it.title || '', description: it.description || '' })),
     };
+  } else if (p.format === 'slide') {
+    p.style = p.style === 'cover' ? 'cover' : 'slide';
+    p.cover = { tone: 'blue', tag: '', title: '', underline: '', summary: '', ...(p.cover || {}) };
+    p.slide = { tag: '', title: '', titleAccent: '', summary: '', ...(p.slide || {}), visual: { ...emptyVisual(), ...(p.slide?.visual || {}) } };
   } else {
     const slides = p.slides || [];
     if (!p.cover) {
@@ -97,6 +102,8 @@ function SlideVisual({ visual }) {
         tone: 'brand',
         items: items.slice(0, 5).map((it) => ({ label: it.label, value: Number(it.value) || 0, display: it.display || String(it.value ?? '') })),
       });
+    case 'image':
+      return h(J.CarouselImage, { src: visual.src || undefined, alt: visual.alt || '' });
     case 'venn':
       if (!visual.left && !visual.right && !visual.overlap) return null;
       return h(J.CarouselVenn, { left: visual.left, overlap: visual.overlap, right: visual.right, tone: 'highlight', diameter: 660 });
@@ -105,11 +112,12 @@ function SlideVisual({ visual }) {
   }
 }
 
-function Cover({ cover }) {
+function Cover({ cover, last = false }) {
   return h(
     'div',
     { className: 'ds ds-page' },
     h(J.CoverCard, {
+      swipe: last ? false : undefined,
       tone: cover.tone,
       tag: cover.tag || undefined,
       title: underlined(cover.title, cover.underline),
@@ -139,6 +147,9 @@ function Slide({ slide, last }) {
 // Lista de elementos React, uno por imagen exportable.
 export function pages(post) {
   if (post.format === 'card') return [h(SocialPost, { card: post.card })];
+  if (post.format === 'slide') {
+    return [post.style === 'cover' ? h(Cover, { cover: post.cover, last: true }) : h(Slide, { slide: post.slide, last: true })];
+  }
   const slides = post.slides || [];
   return [h(Cover, { cover: post.cover }), ...slides.map((s, i) => h(Slide, { slide: s, last: i === slides.length - 1 }))];
 }

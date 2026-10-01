@@ -4,10 +4,16 @@ Panel para revisar, organizar y publicar en LinkedIn los posts que prepara Claud
 en el menú lateral:
 
 - **AI Digest**: las propuestas semanales (ver abajo).
-- **Crear post**: pides a Claude un post (texto libre → carrusel o card) o lo **escribes tú** con
-  "Escribirlo yo". Las gráficas se dibujan con el design system jpdazab y se editan con vista previa en vivo.
-  Se descargan en PNG (y el carrusel en PDF para LinkedIn). Los últimos 20 posts quedan guardados en el navegador.
-  "Escribirlo yo" no necesita ninguna API.
+- **Crear post**, con tres modos:
+  - **Pedir a Claude**: describes la idea y Claude escribe el post y la gráfica (necesita la API key).
+  - **Pegar mi texto**: pegas un post ya escrito y Posty reparte el texto en la gráfica sin IA
+    (gancho → titular, listas → puntos o slides, cifras → tarjetas de datos, pregunta final → cierre).
+  - **Desde cero**: rellenas el texto y la gráfica a mano.
+
+  Formatos: **carrusel** (portada + slides), **card única** (una sola slide del carrusel: estilo portada o
+  slide con cifras, barras, Venn o **imagen**) y **card con lista**. Las gráficas usan el design system
+  jpdazab y se editan con vista previa en vivo; "Volver sin guardar" descarta los cambios. Se descargan
+  en PNG (y el carrusel en PDF). Los últimos 20 posts quedan en el navegador y se pueden borrar.
 
 ## Cómo funciona
 
@@ -45,7 +51,9 @@ fuentes Switzer y Projekt Blackbird, y los logos. `tokens.css` se genera desde `
 Geist Mono llega desde el paquete `@fontsource/geist-mono`.
 
 - Card: post social 1080 × 1351 (titular con frase destacada, lead, `NumberedCardList`, lockup).
-- Carrusel: `CoverCard` + `SlideCard` 1231 × 1731, con `StatGrid`, `ProgressBars` o `CarouselVenn` opcionales.
+- Carrusel: `CoverCard` + `SlideCard` 1231 × 1731, con `StatGrid`, `ProgressBars`, `CarouselVenn` o
+  `CarouselImage` (Template-5, card con imagen) opcionales.
+- Card única: un solo `CoverCard` o `SlideCard` 1231 × 1731, sin "Swipe".
 - Projekt Blackbird no tiene tildes ni ñ: el editor avisa cuando un campo en esa fuente las lleva.
 
 Si el design system cambia, vuelve a copiar esos archivos desde el artifact.
