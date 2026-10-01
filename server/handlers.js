@@ -4,6 +4,7 @@
 // - POST /api/generate   { prompt, format }       Genera un post con Claude (sesión + límite mensual).
 // - POST /api/proposals?week=AAAA-Www            Markdown de la semana (rutina semanal, token personal).
 // - POST /api/proposals?week=AAAA-Www&file=x.png Un archivo de la semana (imagen o PDF).
+// - POST /api/digest     { which, today, extra } Genera las propuestas de una semana con Claude (sesión + límite).
 // - GET  /api/topics                             Temas del AI Digest de la persona (rutina semanal, token personal).
 
 import { createHash } from 'node:crypto';
@@ -11,6 +12,7 @@ import { createClient } from '@supabase/supabase-js';
 import { generatePost, checkAccess, GenerateError } from './generate.js';
 import { parseWeek } from '../src/parser.js';
 import { normalizeSettings, settingsBrief } from '../src/topics-format.js';
+import { generateWeek } from './digest.js';
 
 export const MAX_MARKDOWN = 1024 * 1024; // 1 MB
 export const MAX_FILE = 4 * 1024 * 1024; // 4 MB (Vercel admite 4,5 MB por petición)
@@ -83,6 +85,70 @@ export async function handleGenerate(req, deps = {}) {
     console.error(err);
     return reply(500, { error: 'Error inesperado al generar el post.' });
   }
+}
+
+// ---------- /api/digest ----------
+
+// Una generación cuenta un crédito por propuesta. Si Claude falla, se devuelven todos.
+export async function handleDigest(req, deps = {}) {
+  if (req.method !== 'POST') return reply(405, { error: 'Método no permitido' });
+  const db = deps.admin === undefined ? adminClient() : deps.admin;
+  const generate = deps.generateWeek || generateWeek;
+
+  let body;
+  try {
+    body = JSON.parse(req.body?.toString('utf8') || '{}');
+  } catch {
+    return reply(400, { error: 'La petición no es JSON válido.' });
+  }
+
+  let userId = null;
+  let charged = 0;
+  try {
+    let settings;
+    if (db) {
+      const token = bearer(req.headers);
+      if (!token) return reply(401, { error: 'Inicia sesión para usar Claude.' });
+      const { data, error } = await db.auth.getUser(token);
+      if (error || !data?.user) return reply(401, { error: 'Tu sesión caducó. Recarga la página.' });
+      userId = data.user.id;
+      // Los temas guardados en la cuenta, los mismos que lee la rutina.
+      const { data: row, error: readError } = await db.from('digest_settings').select('data').eq('user_id', userId).maybeSingle();
+      if (readError) throw readError;
+      settings = normalizeSettings(row?.data);
+    } else {
+      checkAccess(req.headers['x-posty-code']);
+      settings = normalizeSettings(body.settings);
+    }
+    if (!settings.topics.length) return reply(400, { error: 'Elige primero tus temas en el AI Digest.' });
+
+    if (db) {
+      const limit = monthlyLimit();
+      for (let i = 0; i < settings.postsPerWeek; i++) {
+        const { data: count, error: rpcError } = await db.rpc('consume_ai_credit', { p_user: userId, p_limit: limit });
+        if (rpcError) throw rpcError;
+        if (count === null) {
+          await refund(db, userId, charged);
+          charged = 0;
+          return reply(429, {
+            error: `Generar ${settings.postsPerWeek} propuestas supera tu límite de ${limit} posts con Claude este mes. Baja los posts por semana en tus temas o espera al mes que viene.`,
+          });
+        }
+        charged += 1;
+      }
+    }
+    const result = await generate({ which: body.which, today: body.today, settings, extra: String(body.extra || '') });
+    return reply(200, result);
+  } catch (err) {
+    if (userId && charged) await refund(db, userId, charged);
+    if (err instanceof GenerateError) return reply(err.status, { error: err.message });
+    console.error(err);
+    return reply(500, { error: 'Error inesperado al generar las propuestas.' });
+  }
+}
+
+async function refund(db, userId, n) {
+  for (let i = 0; i < n; i++) await db.rpc('refund_ai_credit', { p_user: userId }).catch(() => {});
 }
 
 // ---------- Rutinas: token personal ----------

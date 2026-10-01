@@ -606,3 +606,11 @@ body.wizard-open { overflow: hidden; }
   .topics-fields { grid-template-columns: 1fr; }
 }
 .topic-row .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; font-size: 1.3rem; line-height: 1; }
+.gen-panel { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.gen-panel > p { margin: 0; }
+.week-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.week-option { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+.week-option input { grid-row: span 2; accent-color: var(--brand); }
+.week-option.active { border-color: var(--brand); background: var(--brand-soft); }
+.warn-text { color: var(--warn); font-weight: 600; }
+.topics-head .actions { flex-wrap: wrap; justify-content: flex-end; }

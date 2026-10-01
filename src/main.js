@@ -510,6 +510,10 @@ function showRoute() {
 }
 
 // Vuelve a cargar las semanas (por ejemplo, tras subir una desde Cuenta).
+export function hasWeek(id) {
+  return weeks.some((w) => w.id === id);
+}
+
 export async function reloadWeeks() {
   setWeeks(await getBackend().listWeeks());
   render();

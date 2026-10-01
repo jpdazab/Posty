@@ -4,9 +4,13 @@
 import { $, esc, toast } from './ui.js';
 import { getBackend } from './backend.js';
 import { normalizeSettings, TOPIC_SUGGESTIONS, MAX_TOPICS } from './topics-format.js';
+import { targetWeek, localToday } from './week-dates.js';
+import { hasWeek, reloadWeeks } from './main.js';
+import { resetWeekStates } from './store.js';
 
 let saved = normalizeSettings(null);
-const ui = { editing: false, draft: null, saving: false };
+// gen: null | { step: 'ask' | 'loading', which, extra, error }
+const ui = { editing: false, draft: null, saving: false, gen: null };
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
@@ -26,10 +30,100 @@ function renderSummary() {
           <h2>Tus temas</h2>
           <p class="muted small">${saved.postsPerWeek} ${saved.postsPerWeek === 1 ? 'post' : 'posts'} por semana${saved.audience ? ` · Para ${esc(saved.audience)}` : ''}</p>
         </div>
-        <button class="btn ghost small" data-topics-action="edit">Editar temas</button>
+        <div class="actions">
+          <button class="btn ghost small" data-topics-action="edit">Editar temas</button>
+          ${ui.gen ? '' : '<button class="btn primary small" data-topics-action="gen-open">✳ Generar propuestas ahora</button>'}
+        </div>
       </div>
       <div class="topic-chips">${saved.topics.map((t) => `<span class="topic-chip" title="${esc(t.note)}">${esc(t.name)}</span>`).join('')}</div>
+      ${ui.gen ? renderGenerate() : ''}
     </div>`;
+}
+
+// ---------- Generar propuestas ahora ----------
+
+function weeksToOffer() {
+  const today = localToday();
+  return { current: targetWeek('current', today), next: targetWeek('next', today) };
+}
+
+const shortDate = (d) => new Date(`${d}T12:00:00`).toLocaleDateString('es', { day: 'numeric', month: 'short' });
+
+function renderGenerate() {
+  const g = ui.gen;
+  const n = saved.postsPerWeek;
+  if (g.step === 'loading') {
+    return `<div class="gen-panel"><p class="typing"><span></span><span></span><span></span> Claude está preparando ${n} ${n === 1 ? 'propuesta' : 'propuestas'} para ${esc(g.weekId)}… suele tardar uno o dos minutos. No cierres esta página.</p></div>`;
+  }
+  const weeks = weeksToOffer();
+  const chosen = weeks[g.which];
+  const option = (key, label) => {
+    const w = weeks[key];
+    return `<label class="week-option ${g.which === key ? 'active' : ''}">
+      <input type="radio" name="gen-week" value="${key}" ${g.which === key ? 'checked' : ''} />
+      <strong>${label}</strong><span class="muted small">${esc(w.id)} · ${shortDate(w.days[0])} – ${shortDate(w.days[w.days.length - 1])}</span>
+    </label>`;
+  };
+  return `
+    <div class="gen-panel">
+      <div class="week-options">${option('current', 'Esta semana')}${option('next', 'La próxima semana')}</div>
+      ${hasWeek(chosen.id) ? `<p class="warn-text small">Ya tienes propuestas para ${esc(chosen.id)}: se reemplazarán por las nuevas (también sus imágenes y su estado).</p>` : ''}
+      <label class="ed-field"><span>¿Algo concreto para esta tanda? (opcional)</span>
+        <textarea data-gen="extra" rows="2" maxlength="1000" placeholder="Un evento, un lanzamiento, una idea que quieras contar…">${esc(g.extra)}</textarea>
+      </label>
+      <p class="muted small">Claude escribe ${n} ${n === 1 ? 'propuesta' : 'propuestas'} con tus temas (sin imágenes). Cuenta${n === 1 ? '' : 'n'} como ${n} ${n === 1 ? 'post generado' : 'posts generados'} de tu límite mensual.</p>
+      ${g.error ? `<p class="error-text">${esc(g.error)}</p>` : ''}
+      <div class="actions start">
+        <button class="btn primary" data-topics-action="gen-run">Generar ${n} ${n === 1 ? 'propuesta' : 'propuestas'}</button>
+        <button class="btn ghost" data-topics-action="gen-cancel">Cancelar</button>
+      </div>
+    </div>`;
+}
+
+async function runGenerate() {
+  const g = ui.gen;
+  const week = weeksToOffer()[g.which];
+  const replacing = hasWeek(week.id);
+  g.weekId = week.id;
+  g.step = 'loading';
+  g.error = null;
+  renderTopics();
+  try {
+    const backend = getBackend();
+    const auth = backend.mode === 'cloud' ? { Authorization: `Bearer ${await backend.accessToken()}` } : readLocalCode();
+    const res = await fetch('/api/digest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...auth },
+      body: JSON.stringify({ which: g.which, today: localToday(), extra: g.extra, settings: saved }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || (res.status === 404 ? 'Generar propuestas solo funciona con la web desplegada en Vercel y la API key configurada.' : 'No se pudieron generar las propuestas.'));
+    }
+    if (replacing) {
+      await backend.deleteWeek(data.week);
+      resetWeekStates(data.week);
+    }
+    await backend.saveWeek(data.week, data.source, []);
+    ui.gen = null;
+    await reloadWeeks();
+    renderTopics();
+    toast(`${data.posts} ${data.posts === 1 ? 'propuesta lista' : 'propuestas listas'} para ${data.week}`);
+    document.querySelector(`[data-week="${CSS.escape(data.week)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (err) {
+    g.step = 'ask';
+    g.error = err.message === 'Failed to fetch' ? 'No hay conexión con el servidor.' : err.message;
+    renderTopics();
+  }
+}
+
+// En modo local (sin cuentas) se usa el mismo código de acceso que en Crear post.
+function readLocalCode() {
+  try {
+    return { 'x-posty-code': JSON.parse(localStorage.getItem('posty:access-code') || '""') };
+  } catch {
+    return {};
+  }
 }
 
 function renderEditor() {
@@ -153,6 +247,20 @@ export function initTopicsPanel() {
         ui.draft = clone(saved);
         renderTopics();
         break;
+      case 'gen-open': {
+        const day = new Date().getDay();
+        // De viernes a domingo, lo normal es preparar la semana siguiente.
+        ui.gen = { step: 'ask', which: day === 0 || day >= 5 ? 'next' : 'current', extra: '', error: null };
+        renderTopics();
+        break;
+      }
+      case 'gen-cancel':
+        ui.gen = null;
+        renderTopics();
+        break;
+      case 'gen-run':
+        runGenerate();
+        break;
       case 'cancel':
         ui.editing = false;
         ui.draft = null;
@@ -170,8 +278,18 @@ export function initTopicsPanel() {
         break;
     }
   });
+  root.addEventListener('change', (e) => {
+    if (e.target.name === 'gen-week' && ui.gen) {
+      ui.gen.which = e.target.value;
+      renderTopics();
+    }
+  });
   root.addEventListener('input', (e) => {
     const el = e.target;
+    if (el.dataset.gen && ui.gen) {
+      ui.gen[el.dataset.gen] = el.value;
+      return;
+    }
     if (!ui.draft) return;
     if (el.dataset.topic) {
       const [i, key] = el.dataset.topic.split('.');

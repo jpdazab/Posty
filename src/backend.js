@@ -13,7 +13,7 @@ export const mode = SUPABASE_URL && SUPABASE_ANON_KEY ? 'cloud' : 'local';
 
 // ---------- Local ----------
 
-const LOCAL_KEYS = { states: 'posty:state:v1', created: 'posty:created:v1', kit: 'posty:kit:v1', digest: 'posty:digest:v1' };
+const LOCAL_KEYS = { states: 'posty:state:v1', created: 'posty:created:v1', kit: 'posty:kit:v1', digest: 'posty:digest:v1', weeks: 'posty:weeks:v1' };
 
 function readLocal(key, fallback) {
   try {
@@ -53,8 +53,15 @@ function localBackend() {
   return {
     mode: 'local',
     user: null,
+    // Semanas generadas desde Posty (las imágenes solo existen en modo cuentas).
     async listWeeks() {
-      return [];
+      return readLocal(LOCAL_KEYS.weeks, []).map((w) => ({ ...w, files: {} }));
+    },
+    async saveWeek(week, source) {
+      writeLocal(LOCAL_KEYS.weeks, [...readLocal(LOCAL_KEYS.weeks, []).filter((w) => w.week !== week), { week, source }]);
+    },
+    async deleteWeek(week) {
+      writeLocal(LOCAL_KEYS.weeks, readLocal(LOCAL_KEYS.weeks, []).filter((w) => w.week !== week));
     },
     async loadStates() {
       return readLocal(LOCAL_KEYS.states, {});

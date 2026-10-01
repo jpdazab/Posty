@@ -43,6 +43,16 @@ export function updatePost(id, patch) {
   save(id);
 }
 
+// Al reemplazar una semana, sus posts nuevos empiezan como pendientes (los ids se repiten: 2026-W41-1…).
+export function resetWeekStates(weekId) {
+  for (const id of Object.keys(state)) {
+    if (id.startsWith(`${weekId}-`)) {
+      state = { ...state, [id]: {} };
+      save(id);
+    }
+  }
+}
+
 export function exportState() {
   return JSON.stringify({ app: 'posty', version: 1, exportedAt: new Date().toISOString(), posts: state }, null, 2);
 }

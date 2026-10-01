@@ -82,10 +82,18 @@ export async function generatePost({ prompt, format }) {
   if (typeof prompt !== 'string' || !prompt.trim()) throw new GenerateError(400, 'Escribe de qué quieres que trate el post.');
   if (prompt.length > 8000) throw new GenerateError(400, 'La petición es demasiado larga (máximo 8.000 caracteres).');
   if (!FORMATS.includes(format)) throw new GenerateError(400, 'Formato no válido: elige carrusel, card única o card.');
+  return { format, ...(await callClaude({
+    system: `${SYSTEM_PROMPT}\n\n${{ carousel: CAROUSEL_GUIDE, card: CARD_GUIDE, slide: SLIDE_GUIDE }[format]}`,
+    prompt: prompt.trim(),
+    schema: SCHEMAS[format],
+  })) };
+}
+
+// Llamada a Claude con salida JSON según `schema`. Convierte los fallos en GenerateError legibles.
+export async function callClaude({ system, prompt, schema, effort = 'medium' }) {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new GenerateError(500, 'Falta configurar ANTHROPIC_API_KEY en el servidor.');
   }
-
   client ??= new Anthropic();
 
   let response;
@@ -95,12 +103,9 @@ export async function generatePost({ prompt, format }) {
       max_tokens: 16000,
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
-      output_config: {
-        effort: 'medium',
-        format: { type: 'json_schema', schema: SCHEMAS[format] },
-      },
-      system: `${SYSTEM_PROMPT}\n\n${{ carousel: CAROUSEL_GUIDE, card: CARD_GUIDE, slide: SLIDE_GUIDE }[format]}`,
-      messages: [{ role: 'user', content: prompt.trim() }],
+      output_config: { effort, format: { type: 'json_schema', schema } },
+      system,
+      messages: [{ role: 'user', content: prompt }],
     });
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) throw new GenerateError(500, 'La API key de Anthropic no es válida.');
@@ -117,13 +122,11 @@ export async function generatePost({ prompt, format }) {
   }
 
   const raw = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
-  let post;
   try {
-    post = JSON.parse(raw);
+    return JSON.parse(raw);
   } catch {
     throw new GenerateError(502, 'Claude devolvió una respuesta que no se pudo leer. Vuelve a intentarlo.');
   }
-  return { format, ...post };
 }
 
 // Comprueba el código de acceso opcional (POSTY_ACCESS_CODE) para que nadie más gaste la API key.

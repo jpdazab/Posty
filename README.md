@@ -8,7 +8,9 @@ Páginas del menú lateral:
 
 - **AI Digest**: las propuestas semanales (ver abajo). Arriba, **Tus temas**: cada cuenta elige sus temas
   (con un enfoque opcional), cuántos posts quiere por semana, para quién escribe e indicaciones para
-  Claude. Su rutina semanal los lee con `GET /api/topics`.
+  Claude. Su rutina semanal los lee con `GET /api/topics`. Con **Generar propuestas ahora** Claude prepara
+  al momento la tanda de esta semana o de la próxima (solo texto, con los mismos temas), sin esperar a la
+  rutina; cuenta un post del límite mensual por propuesta.
 - **Crear post**, con tres modos:
   - **Pedir a Claude**: describes la idea y Claude escribe el post y la gráfica (necesita la API key).
   - **Pegar mi texto**: pegas un post ya escrito y Posty reparte el texto en la gráfica sin IA
@@ -91,6 +93,8 @@ Si el design system cambia, vuelve a copiar esos archivos desde el artifact.
     (si Claude falla, el intento no cuenta).
   - `POST /api/proposals?week=AAAA-Www[&file=…]`: recibe el Markdown y los archivos de la rutina semanal,
     autenticada con el token personal de cada usuario.
+  - `POST /api/digest`: genera con Claude las propuestas de una semana con los temas guardados de la persona
+    (sesión + `AI_MONTHLY_LIMIT`, un crédito por propuesta). Devuelve el Markdown, que la web guarda como semana.
   - `GET /api/topics`: los temas del digest de la persona del token, en JSON y como texto (`brief`).
 - **Supabase** (`supabase/schema.sql`): tablas con seguridad por usuario y Storage para archivos.
   `supabase/tests/` prueba que cada usuario solo accede a lo suyo.

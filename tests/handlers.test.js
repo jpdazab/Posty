@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { handleGenerate, handleProposals, handleTopics, hashToken } from '../server/handlers.js';
+import { handleGenerate, handleProposals, handleTopics, handleDigest, hashToken } from '../server/handlers.js';
 import { GenerateError } from '../server/generate.js';
 
 // Supabase simulado: registra las llamadas y responde según `db`.
@@ -174,4 +174,47 @@ test('topics: sin temas elegidos, la rutina sigue con los suyos', async () => {
   assert.equal(res.status, 200);
   assert.deepEqual(res.json.topics, []);
   assert.match(res.json.brief, /aún no eligió temas/);
+});
+
+// ---------- /api/digest ----------
+
+test('digest: cobra un crédito por propuesta y usa los temas guardados', async () => {
+  db.settings = { 'user-a': { topics: [{ name: 'IA' }], postsPerWeek: 2 } };
+  process.env.AI_MONTHLY_LIMIT = '5';
+  const admin = fakeAdmin(db);
+  let args;
+  const generateWeek = async (a) => ((args = a), { week: '2026-W41', source: 'x', posts: 2 });
+  const res = await handleDigest(post({ which: 'next', today: '2026-10-01', settings: { topics: [{ name: 'trampa' }] } }, { authorization: 'Bearer jwt-a' }), { admin, generateWeek });
+  assert.equal(res.status, 200);
+  assert.deepEqual(args.settings.topics, [{ name: 'IA', note: '' }]);
+  assert.equal(admin.calls.filter((c) => c[1] === 'consume_ai_credit').length, 2);
+});
+
+test('digest: si no alcanza el límite o Claude falla, devuelve los créditos', async () => {
+  db.settings = { 'user-a': { topics: [{ name: 'IA' }], postsPerWeek: 3 } };
+  process.env.AI_MONTHLY_LIMIT = '2';
+  let admin = fakeAdmin(db);
+  const over = await handleDigest(post({ which: 'next' }, { authorization: 'Bearer jwt-a' }), { admin, generateWeek: async () => assert.fail('no debe generar') });
+  assert.equal(over.status, 429);
+  assert.equal(admin.calls.filter((c) => c[1] === 'refund_ai_credit').length, 2);
+
+  db.usage = 0;
+  process.env.AI_MONTHLY_LIMIT = '10';
+  admin = fakeAdmin(db);
+  const failed = await handleDigest(post({ which: 'next' }, { authorization: 'Bearer jwt-a' }), {
+    admin,
+    generateWeek: async () => {
+      throw new GenerateError(502, 'La respuesta de Claude se cortó.');
+    },
+  });
+  assert.equal(failed.status, 502);
+  assert.equal(admin.calls.filter((c) => c[1] === 'refund_ai_credit').length, 3);
+});
+
+test('digest: sin sesión o sin temas no genera', async () => {
+  const admin = fakeAdmin(db);
+  assert.equal((await handleDigest(post({ which: 'next' }), { admin })).status, 401);
+  const none = await handleDigest(post({ which: 'next' }, { authorization: 'Bearer jwt-a' }), { admin });
+  assert.equal(none.status, 400);
+  assert.ok(!admin.calls.some((c) => c[1] === 'consume_ai_credit'));
 });
