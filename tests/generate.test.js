@@ -34,7 +34,7 @@ const message = (content, stop_reason = 'end_turn') => ({
 
 test('genera una card con salida estructurada y fallback por defecto', async () => {
   const { generatePost } = await import('../server/generate.js');
-  const card = { eyebrow: 'Design', headline: 'Menos pantallas', highlight: 'pantallas', lead: 'x', items: ['a', 'b', 'c'] };
+  const card = { headline: 'Menos pantallas', highlight: 'pantallas', lead: 'x', items: [{ title: 'a', description: 'b' }] };
   reply = message([{ type: 'text', text: JSON.stringify({ title: 'T', text: 'Hola', hashtags: ['#UX'], card }) }]);
 
   const post = await generatePost({ prompt: '  Un post sobre UX  ', format: 'card' });
@@ -54,7 +54,7 @@ test('el carrusel pide slides', async () => {
   reply = message([{ type: 'text', text: JSON.stringify({ title: 'T', text: 'x', hashtags: [], slides: [] }) }]);
   await generatePost({ prompt: 'x', format: 'carousel' });
   assert.ok(lastRequest.body.output_config.format.schema.properties.slides);
-  assert.match(lastRequest.body.system, /carrusel de 5 slides/);
+  assert.match(lastRequest.body.system, /Projekt Blackbird/);
 });
 
 test('una negativa de Claude se convierte en un error legible', async () => {

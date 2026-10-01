@@ -1,0 +1,117 @@
+/* Generado desde tokens.json del design system jpdazab (tema light). Las variables viven en .ds para no chocar con las de Posty. */
+.ds {
+  --violet-50: #f3f4ff;
+  --violet-100: #e7e9ff;
+  --violet-200: #d0d4fe;
+  --violet-300: #aeb3fe;
+  --violet-400: #8887fe;
+  --violet-500: #5438dc;
+  --violet-600: #451ac5;
+  --violet-700: #3708a5;
+  --violet-800: #290083;
+  --violet-900: #1c0061;
+  --violet-950: #100041;
+  --neutral-0: #ffffff;
+  --neutral-25: #f9fafe;
+  --neutral-50: #f4f5f9;
+  --neutral-100: #eaebef;
+  --neutral-200: #dddee2;
+  --neutral-300: #c9cad2;
+  --neutral-400: #a3a4ac;
+  --neutral-500: #7f7f87;
+  --neutral-600: #62636a;
+  --neutral-700: #494a51;
+  --neutral-800: #2f3036;
+  --neutral-850: #202127;
+  --neutral-900: #17181e;
+  --neutral-950: #0e0f15;
+  --ink-900: #1a1926;
+  --grey-canvas: #f5f5f5;
+  --orange-400: #f29950;
+  --violet-web: #473bf0;
+  --violet-web-200: #cac6fa;
+  --grey-100: #f0f0f0;
+  --grey-200: #e6e6e6;
+  --grey-300: #d9d9d9;
+  --grey-400: #a3a3a3;
+  --grey-850: #1f1f1f;
+  --grey-900: #171717;
+  --grey-950: #0a0a0a;
+  --ink-950: #050516;
+  --yellow-300: #fff07c;
+  --yellow-700: #a39000;
+  --yellow-100: #ffffb3;
+  --blue-300: #7ca2f3;
+  --blue-electric: #0004eb;
+  --surface: #ffffff;
+  --canvas: #f5f5f5;
+  --surface-subtle: #f0f0f0;
+  --surface-raised: #ffffff;
+  --border: #dddee2;
+  --border-strong: #7f7f87;
+  --ink: #1a1926;
+  --ink-muted: #62636a;
+  --ink-soft: rgba(26,25,38,0.6);
+  --brand: #5438dc;
+  --brand-hover: #451ac5;
+  --brand-soft: #f3f4ff;
+  --brand-soft-ink: #3708a5;
+  --on-brand: #ffffff;
+  --focus-ring: #5438dc;
+  --logo-violet: #5438dc;
+  --accent: #f29950;
+  --brand-fill: #473bf0;
+  --on-brand-fill: #ffffff;
+  --on-brand-fill-muted: #cac6fa;
+  --surface-inverse: #171717;
+  --on-inverse: #ffffff;
+  --on-inverse-muted: #a3a3a3;
+  --ink-faint: #a3a3a3;
+  --highlight: #fff07c;
+  --highlight-ink: #a39000;
+  --accent-cool: #7ca2f3;
+  --glass: rgba(240,240,240,0.6);
+  --carousel-summary: #494a51;
+  --carousel-meta: #62636a;
+  --carousel-handle: #919099;
+  --carousel-card: #e6e6e6;
+  --carousel-ink: #050516;
+  --carousel-accent: #0004eb;
+  --carousel-highlight: #ffffb3;
+  --carousel-data-ink: #171717;
+  --carousel-placeholder: #d9d9d9;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+  --radius-tile: 16px;
+  --radius-slide: 50px;
+  --radius-full: 9999px;
+  --blur-glass: blur(50px);
+  --shadow-sm: 0 1px 2px rgba(20,0,76,0.08);
+  --shadow-md: 0 8px 24px rgba(20,0,76,0.10), 0 2px 6px rgba(20,0,76,0.06);
+  --shadow-inset-highlight: inset 0 1px 2px 0 #ffffff;
+  --shadow-inset-glow: inset 0 1px 8px 7px rgba(255,255,255,0.2);
+  --shadow-glass: inset 0 1px 11px -5px #ffffff;
+  --font-sans: "Switzer", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-blackbird: "Projekt Blackbird", "Switzer", ui-sans-serif, system-ui, sans-serif;
+}
+@font-face { font-family: "Switzer"; src: url("./fonts/Switzer-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: block; }
+@font-face { font-family: "Switzer"; src: url("./fonts/Switzer-Italic.woff2") format("woff2"); font-weight: 400; font-style: italic; font-display: block; }
+@font-face { font-family: "Switzer"; src: url("./fonts/Switzer-Medium.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: block; }
+@font-face { font-family: "Switzer"; src: url("./fonts/Switzer-MediumItalic.woff2") format("woff2"); font-weight: 500; font-style: italic; font-display: block; }
+@font-face { font-family: "Switzer"; src: url("./fonts/Switzer-Semibold.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: block; }
+@font-face { font-family: "Switzer"; src: url("./fonts/Switzer-Bold.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: block; }
+@font-face { font-family: "Projekt Blackbird"; src: url("./fonts/ProjektBlackbird-Regular.otf") format("opentype"); font-weight: 400; font-style: normal; font-display: block; }

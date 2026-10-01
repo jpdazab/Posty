@@ -10,12 +10,19 @@ Escribes en español, en prosa concisa, directa y editorial. Nada de listas con 
 Cada post: una primera línea que funcione como gancho (es lo único que se ve antes de "ver más"), 120 a 200 palabras, y una pregunta final que invite a conversar. Los hashtags van aparte, nunca dentro del texto.
 También escribes el contenido de la gráfica que acompaña al post. Los textos de la gráfica son cortos y legibles en el móvil.`;
 
-const CAROUSEL_GUIDE = `Formato: carrusel de 5 slides para subir como documento PDF.
-Slide 1 es la portada (título con gancho y un subtítulo). Slides 2 a 4 desarrollan una idea cada una. Slide 5 cierra con la conclusión y la pregunta.
-En cada slide: "kicker" (2 a 4 palabras, va en mayúsculas pequeñas), "title" (máximo 8 palabras) y "body" (máximo 30 palabras; en la portada, el subtítulo).`;
+const BLACKBIRD_RULE = `Los campos marcados como "Blackbird" se dibujan con la fuente Projekt Blackbird, que NO tiene á é í ó ú ü ñ ¿ ¡: escríbelos en español eligiendo palabras sin esas letras (por ejemplo "IA" en vez de "inteligencia", "equipo" en vez de "diseño").`;
 
-const CARD_GUIDE = `Formato: una card (imagen 4:5) con titular y una lista numerada.
-"eyebrow": 2 a 4 palabras. "headline": máximo 10 palabras. "highlight": una frase literal y corta contenida en el headline que se destacará en color. "lead": una frase de apoyo de máximo 20 palabras. "items": de 3 a 4 puntos de máximo 12 palabras cada uno.`;
+const CAROUSEL_GUIDE = `Formato: carrusel para subir a LinkedIn como PDF, con el design system jpdazab.
+- cover (portada): "tone" (blue por defecto), "tag" (Blackbird, 1 o 2 palabras en minúscula), "title" (Blackbird, gancho de máximo 45 caracteres, hasta 3 líneas), "underline" (una palabra exacta del title para subrayar, o ""), "summary" (máximo 120 caracteres).
+- slides: de 3 a 5. Cada una con "tag" (Blackbird, 1 o 2 palabras), "title" y "titleAccent" (Blackbird, máximo 18 caracteres cada uno: son las dos líneas del título, la segunda va en azul), "summary" (máximo 120 caracteres, una idea).
+- "visual" de cada slide: usa "none" salvo que Juan te dé cifras reales. Con cifras: "stats" (2 a 6 items con "display" corto como "48%" y "label" Blackbird de 2 a 4 palabras), "bars" (2 a 5 items con "value" de 0 a 100, "display" y "label") o "venn" (dos conceptos en "left" y "right" y su cruce en "overlap", Blackbird, máximo 2 palabras cada uno). Deja vacíos los campos que no uses.
+- La última slide cierra con la conclusión.
+${BLACKBIRD_RULE}`;
+
+const CARD_GUIDE = `Formato: post social 1080 x 1351 con el design system jpdazab.
+- "headline": máximo 45 caracteres (dos líneas). "highlight": una frase literal y corta contenida en el headline, que irá en naranja.
+- "lead": una frase de apoyo de máximo 60 caracteres.
+- "items": de 3 a 4 puntos, cada uno con "title" (máximo 28 caracteres, una línea) y "description" (máximo 80 caracteres).`;
 
 const base = {
   title: { type: 'string', description: 'Título interno corto para organizar el post' },
@@ -23,44 +30,39 @@ const base = {
   hashtags: { type: 'array', items: { type: 'string' }, description: '3 hashtags con #' },
 };
 
+const obj = (properties) => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
+const str = { type: 'string' };
+
 const SCHEMAS = {
-  carousel: {
-    type: 'object',
-    properties: {
-      ...base,
-      slides: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: { kicker: { type: 'string' }, title: { type: 'string' }, body: { type: 'string' } },
-          required: ['kicker', 'title', 'body'],
-          additionalProperties: false,
-        },
-      },
+  carousel: obj({
+    ...base,
+    cover: obj({ tone: { type: 'string', enum: ['blue', 'ink', 'grey', 'yellow'] }, tag: str, title: str, underline: str, summary: str }),
+    slides: {
+      type: 'array',
+      items: obj({
+        tag: str,
+        title: str,
+        titleAccent: str,
+        summary: str,
+        visual: obj({
+          kind: { type: 'string', enum: ['none', 'stats', 'bars', 'venn'] },
+          items: { type: 'array', items: obj({ label: str, value: { type: 'number' }, display: str }) },
+          left: str,
+          overlap: str,
+          right: str,
+        }),
+      }),
     },
-    required: ['title', 'text', 'hashtags', 'slides'],
-    additionalProperties: false,
-  },
-  card: {
-    type: 'object',
-    properties: {
-      ...base,
-      card: {
-        type: 'object',
-        properties: {
-          eyebrow: { type: 'string' },
-          headline: { type: 'string' },
-          highlight: { type: 'string' },
-          lead: { type: 'string' },
-          items: { type: 'array', items: { type: 'string' } },
-        },
-        required: ['eyebrow', 'headline', 'highlight', 'lead', 'items'],
-        additionalProperties: false,
-      },
-    },
-    required: ['title', 'text', 'hashtags', 'card'],
-    additionalProperties: false,
-  },
+  }),
+  card: obj({
+    ...base,
+    card: obj({
+      headline: str,
+      highlight: str,
+      lead: str,
+      items: { type: 'array', items: obj({ title: str, description: str }) },
+    }),
+  }),
 };
 
 export class GenerateError extends Error {

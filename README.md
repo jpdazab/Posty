@@ -4,9 +4,10 @@ Panel para revisar, organizar y publicar en LinkedIn los posts que prepara Claud
 en el menú lateral:
 
 - **AI Digest**: las propuestas semanales (ver abajo).
-- **Crear post**: escribes en texto libre de qué quieres hablar, eliges **carrusel** o **card**, y Claude
-  genera ahí mismo el texto del post y la gráfica. Puedes editar el texto, descargar la gráfica en PNG
-  (o el carrusel en PDF para LinkedIn) y publicarlo. Los últimos 20 posts creados quedan guardados en el navegador.
+- **Crear post**: pides a Claude un post (texto libre → carrusel o card) o lo **escribes tú** con
+  "Escribirlo yo". Las gráficas se dibujan con el design system jpdazab y se editan con vista previa en vivo.
+  Se descargan en PNG (y el carrusel en PDF para LinkedIn). Los últimos 20 posts quedan guardados en el navegador.
+  "Escribirlo yo" no necesita ninguna API.
 
 ## Cómo funciona
 
@@ -35,7 +36,21 @@ npm test         # pruebas del parser y del archivo de ejemplo
 npm run build    # sitio estático en dist/
 ```
 
-## Generador de posts (Crear post)
+## Design system jpdazab (`src/ds/`)
+
+Copia del design system publicado en https://claude.ai/artifact/67ierA58ddzJjMydKg2AQm:
+componentes (`bundle.js`, `bundle.css`, `index.d.ts`), `tokens.json` y su documentación (`README.md`),
+fuentes Switzer y Projekt Blackbird, y los logos. `tokens.css` se genera desde `tokens.json`
+(tema light) y sus variables viven bajo la clase `.ds` para no mezclarse con los estilos de Posty.
+Geist Mono llega desde el paquete `@fontsource/geist-mono`.
+
+- Card: post social 1080 × 1351 (titular con frase destacada, lead, `NumberedCardList`, lockup).
+- Carrusel: `CoverCard` + `SlideCard` 1231 × 1731, con `StatGrid`, `ProgressBars` o `CarouselVenn` opcionales.
+- Projekt Blackbird no tiene tildes ni ñ: el editor avisa cuando un campo en esa fuente las lleva.
+
+Si el design system cambia, vuelve a copiar esos archivos desde el artifact.
+
+## Generador de posts con Claude (opcional)
 
 La página llama a `POST /api/generate` (función de Vercel en `api/generate.js`, lógica en
 `server/generate.js`), que usa la API de Claude con salida estructurada. Variables de entorno en Vercel:

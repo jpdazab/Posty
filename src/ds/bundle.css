@@ -1,0 +1,259 @@
+/* jpdazab components. Website pieces measured from juandaza.design; NumberedCard from example1.pdf. */
+.jd-icon { display:block; flex:none; }
+
+/* Button — pill. md: 46px (10/12 padding), lg: 58px (16/18). Label = type style "button". */
+.jd-btn { display:inline-flex; align-items:center; gap:10px; border:0; border-radius:var(--radius-full);
+  font-family:var(--font-sans); font-size:16px; line-height:25.6px; font-weight:400; letter-spacing:0.01em;
+  text-decoration:none; cursor:pointer; white-space:nowrap; transition:filter .15s ease, transform .15s ease; }
+.jd-btn--md { padding:10px 12px; }
+.jd-btn--lg { padding:16px 18px; }
+.jd-btn--primary { background:var(--brand-fill); color:var(--on-brand-fill); }
+.jd-btn--inverse { background:var(--surface-inverse); color:var(--on-inverse); }
+.jd-btn:hover { filter:brightness(1.08); }
+.jd-btn:active { transform:scale(.98); }
+.jd-btn:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
+.jd-btn:disabled { opacity:.4; cursor:not-allowed; filter:none; transform:none; }
+
+/* NavBar — glass pill, 8px inset, 90px between logo and links. */
+.jd-nav { display:inline-flex; align-items:center; gap:90px; padding:8px; border-radius:var(--radius-full);
+  background:var(--glass); box-shadow:var(--shadow-glass); -webkit-backdrop-filter:var(--blur-glass); backdrop-filter:var(--blur-glass);
+  font-family:var(--font-sans); }
+.jd-nav__logo { display:flex; align-items:center; border-radius:var(--radius-full); }
+.jd-nav__logo img { display:block; height:50px; width:auto; }
+.jd-nav__mono { display:flex; align-items:center; justify-content:center; height:50px; padding:0 20px; border-radius:var(--radius-full);
+  background:var(--neutral-0); color:var(--logo-violet); font-weight:900; letter-spacing:.08em; }
+.jd-nav__right { display:flex; align-items:center; gap:16px; }
+.jd-nav__links { display:flex; gap:16px; margin:0; padding:0; list-style:none; }
+.jd-nav__links a { display:inline-flex; align-items:center; gap:4px; color:var(--ink); text-decoration:none;
+  font-size:16px; line-height:25.6px; letter-spacing:0.01em; }
+.jd-nav__links a:hover { color:var(--brand); }
+.jd-nav a:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; border-radius:4px; }
+
+/* BentoCard — 32px radius, 24px padding, title-lg pinned to the bottom. */
+.jd-bento { position:relative; display:flex; flex-direction:column; gap:var(--space-4); box-sizing:border-box; min-height:212px;
+  padding:var(--space-6); border-radius:var(--radius-2xl); font-family:var(--font-sans); text-decoration:none; overflow:hidden; }
+.jd-bento__top { display:flex; justify-content:space-between; align-items:flex-start; }
+.jd-bento__body { flex:1 1 auto; min-height:0; }
+.jd-bento__title { margin:auto 0 0; display:flex; flex-direction:column; font-size:24px; line-height:28.8px; font-weight:500; }
+.jd-bento--tile { background:var(--surface-subtle); color:var(--ink); box-shadow:var(--shadow-inset-highlight); }
+.jd-bento--tile .jd-bento__sub { color:var(--ink-faint); }
+.jd-bento--dark { background:var(--surface-inverse); color:var(--on-inverse); box-shadow:var(--shadow-inset-glow); }
+.jd-bento--dark .jd-bento__sub { color:var(--on-inverse-muted); }
+.jd-bento--highlight { background:var(--highlight); color:var(--grey-900); box-shadow:var(--shadow-inset-highlight); }
+.jd-bento--highlight .jd-bento__sub { color:var(--highlight-ink); }
+.jd-bento--brand { background:var(--brand-fill); color:var(--on-brand-fill); }
+.jd-bento--brand .jd-bento__sub { color:var(--on-brand-fill-muted); }
+a.jd-bento { transition:transform .2s ease; }
+a.jd-bento:hover { transform:translateY(-2px); }
+a.jd-bento:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
+
+/* HeroCard — brand-fill, 32px radius and padding. */
+.jd-hero { display:flex; flex-direction:column; box-sizing:border-box; min-height:424px; padding:var(--space-8);
+  border-radius:var(--radius-2xl); background:var(--brand-fill); color:var(--on-brand-fill-muted); font-family:var(--font-sans); }
+.jd-hero__eyebrow { margin:0 0 var(--space-4); color:var(--on-brand-fill); font-size:18px; line-height:21.6px; font-weight:700; }
+.jd-hero__lead { margin:0; font-size:24px; line-height:28.8px; font-weight:400; max-width:436px; }
+.jd-hero .jd-em { color:var(--on-brand-fill); font-weight:400; }
+.jd-hero__action { margin-top:auto; padding-top:var(--space-8); }
+
+/* TestimonialCard — surface-inverse, 32px radius and padding. */
+.jd-quote { display:flex; flex-direction:column; box-sizing:border-box; margin:0; padding:var(--space-8); border-radius:var(--radius-2xl);
+  background:var(--surface-inverse); color:var(--on-inverse-muted); font-family:var(--font-sans); }
+.jd-quote__text { margin:0; font-size:24px; line-height:28.8px; font-weight:500; }
+.jd-quote .jd-em { color:var(--on-inverse); font-weight:500; }
+.jd-quote__author { display:flex; align-items:center; gap:var(--space-4); margin-top:var(--space-6); }
+.jd-quote__avatar { width:50px; height:50px; flex:none; border-radius:50%; object-fit:cover; background:var(--grey-850); }
+.jd-quote__author > span { display:flex; flex-direction:column; }
+.jd-quote__name { color:var(--on-inverse); font-size:18px; line-height:21.6px; font-weight:500; }
+.jd-quote__role { color:var(--on-inverse-muted); font-size:18px; line-height:28.8px; }
+.jd-quote__action { margin-top:auto; padding-top:var(--space-8); }
+
+/* ReviewCard — surface-raised (grey-850 on the dark section), 24px radius and padding. */
+.jd-review { display:flex; flex-direction:column; gap:var(--space-3); box-sizing:border-box; padding:var(--space-6);
+  border-radius:var(--radius-xl); background:var(--surface-raised); color:var(--ink); font-family:var(--font-sans); }
+.jd-review__label { margin:0; font-family:var(--font-mono); font-size:16px; line-height:25.6px; text-transform:uppercase; color:var(--brand); }
+[data-theme="dark"] .jd-review__label { color:var(--accent-cool); }
+.jd-review__text { margin:0; font-size:18px; line-height:28.8px; letter-spacing:-0.01em; }
+.jd-review__foot { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); margin-top:var(--space-2); }
+.jd-review__source { color:var(--ink-muted); font-size:14px; line-height:20px; }
+
+/* SectionHeader — section-title + body-lg subtitle. */
+.jd-section-head { display:flex; flex-direction:column; gap:var(--space-2); font-family:var(--font-sans); }
+.jd-section-head--center { align-items:center; text-align:center; }
+.jd-section-head__title { margin:0; color:var(--ink); font-size:46px; line-height:55.2px; font-weight:400; letter-spacing:-0.04em; }
+.jd-section-head__sub { margin:0; color:var(--ink-muted); font-size:18px; line-height:28.8px; letter-spacing:-0.01em; }
+
+/* LinkList — list-title rows, 16px vertical padding, hairline under each but the last. */
+.jd-links { margin:0; padding:0 8px; list-style:none; font-family:var(--font-sans); }
+.jd-links li + li { border-top:1px solid var(--border); }
+.jd-links__row { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); padding:16px 0;
+  color:var(--ink); text-decoration:none; }
+.jd-links__title { font-size:32px; line-height:44.8px; letter-spacing:-0.01em; }
+.jd-links__row .jd-icon { transition:transform .2s ease; }
+.jd-links__row:hover .jd-links__title { color:var(--brand); }
+.jd-links__row:hover .jd-icon { transform:translate(2px,-2px); }
+.jd-links__row:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; border-radius:4px; }
+
+/* CaseStudyCard — brand-fill, 24px radius, 16px inset media, title over a fade. */
+.jd-case { position:relative; display:block; box-sizing:border-box; height:410px; padding:var(--space-4); overflow:hidden;
+  border-radius:var(--radius-xl); background:var(--brand-fill); text-decoration:none; font-family:var(--font-sans); }
+.jd-case__media { height:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+.jd-case__media img { max-width:100%; max-height:100%; display:block; }
+.jd-case::after { content:""; position:absolute; left:0; right:0; bottom:0; height:45%;
+  background:linear-gradient(to bottom, rgba(71,59,240,0), var(--brand-fill) 70%); pointer-events:none; }
+.jd-case__title { position:absolute; left:var(--space-8); right:var(--space-8); bottom:var(--space-6); z-index:1; margin:0;
+  color:var(--on-brand-fill); font-size:24px; line-height:28.8px; font-weight:500; }
+a.jd-case:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
+
+/* Statement — display style; unrevealed words at 10% opacity. */
+.jd-statement { margin:0; color:var(--ink); font-family:var(--font-sans); font-size:56px; line-height:67.2px; font-weight:700; letter-spacing:-0.01em; }
+.jd-statement span { opacity:.1; transition:opacity .3s ease; }
+.jd-statement span.is-lit { opacity:1; }
+
+/* NumberedCard: measured from example1.pdf (1080px social post). */
+.jd-ncard { display:flex; gap:var(--space-6); align-items:stretch; font-family:var(--font-sans); }
+.jd-ncard__num { flex:0 0 107px; display:flex; align-items:center; justify-content:center;
+  background:var(--surface-raised); border-radius:var(--radius-xl);
+  color:var(--brand); font-size:46px; line-height:58px; font-weight:600; font-variant-numeric:tabular-nums; }
+.jd-ncard__body { flex:1 1 auto; min-width:0; background:var(--surface-raised); border-radius:var(--radius-xl);
+  padding:var(--space-10); display:flex; flex-direction:column; justify-content:center; gap:var(--space-4); }
+.jd-ncard__title { margin:0; color:var(--brand); font-size:46px; line-height:58px; font-weight:600; }
+.jd-ncard__desc { margin:0; color:var(--ink-soft); font-size:32px; line-height:42px; font-weight:400; }
+.jd-ncard-list { display:flex; flex-direction:column; gap:var(--space-6); }
+
+/* Tag: yellow pill, Projekt Blackbird. lg measured from template-post.pdf (139 x 80 pill, 40px type); md is derived for UI. */
+.jd-tag { display:inline-flex; align-items:center; box-sizing:border-box; border-radius:var(--radius-full);
+  background:var(--highlight); color:var(--ink); font-family:var(--font-blackbird); font-weight:400; letter-spacing:-0.01em; white-space:nowrap; }
+.jd-tag--lg { padding:20px 40px; font-size:40px; line-height:40px; }
+.jd-tag--md { padding:6px 14px; font-size:18px; line-height:20px; }
+
+/* CarouselCard: template-post.pdf, 1231 x 1731, measured at 1:1. */
+.jd-carousel { display:flex; flex-direction:column; box-sizing:border-box; width:1231px; height:1731px; padding:40px 40px 0;
+  background:var(--neutral-0); font-family:var(--font-blackbird); }
+.jd-carousel__card { flex:none; display:flex; flex-direction:column; box-sizing:border-box; height:1507px; padding:40px;
+  background:var(--canvas); border-radius:50px; }
+.jd-carousel__head { display:flex; justify-content:space-between; align-items:flex-start; gap:var(--space-6); min-height:80px; }
+.jd-carousel__meta { margin:0; display:flex; flex-direction:column; text-align:right; max-width:520px;
+  font-family:var(--font-sans); font-size:36px; line-height:40px; font-weight:400; letter-spacing:0.01em; color:var(--carousel-meta); }
+.jd-carousel__title { margin:84px 0 0; display:flex; flex-direction:column; align-items:center; text-align:center;
+  font-size:128px; line-height:138px; font-weight:400; letter-spacing:-0.01em; color:var(--ink); }
+.jd-carousel__title-accent { color:var(--brand-fill); }
+.jd-carousel__summary { margin:8px auto 0; max-width:1040px; text-align:center;
+  font-family:var(--font-sans); font-size:51px; line-height:67px; font-weight:400; color:var(--carousel-summary);
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.jd-carousel__visual { flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; }
+.jd-carousel__foot { flex:1 1 auto; display:flex; align-items:center; justify-content:space-between; padding:0 40px 12px; }
+.jd-carousel__sign { display:flex; align-items:center; gap:18px; }
+.jd-carousel__logo { display:block; height:48px; width:auto; }
+.jd-carousel__handle { font-size:36px; line-height:44px; color:var(--carousel-handle); }
+.jd-carousel__swipe { display:inline-flex; align-items:center; gap:8px; font-size:50px; line-height:60px; letter-spacing:-0.01em; color:var(--brand-fill); }
+
+/* CarouselVenn: two sets one radius apart (634px default; 660px in Template-4). */
+.jd-venn { position:relative; font-family:var(--font-blackbird); }
+.jd-venn svg { display:block; }
+.jd-venn__set { fill:var(--surface-raised); }
+.jd-venn__overlap { fill:var(--brand-fill); }
+.jd-venn__label { position:absolute; top:50%; transform:translate(-50%,-50%); text-align:center; white-space:pre-line;
+  font-size:56px; line-height:61px; letter-spacing:-0.01em; color:var(--ink); }
+.jd-venn__label--mid { max-width:300px; color:var(--on-brand-fill); }
+.jd-venn--highlight .jd-venn__set { fill:var(--neutral-0); }
+.jd-venn--highlight .jd-venn__overlap { fill:var(--carousel-highlight); }
+.jd-venn--highlight .jd-venn__label { color:var(--carousel-ink); }
+.jd-venn--highlight .jd-venn__label--mid { color:var(--carousel-accent); }
+
+/* Tag tones for the carousel files. */
+.jd-tag--soft { background:var(--carousel-highlight); color:var(--carousel-ink); }
+.jd-tag--ink { background:var(--carousel-ink); color:var(--neutral-0); }
+
+/* ===== Carousel covers & slides: Cover_*.pdf / Template-1..7.pdf, 1231 x 1731, measured 1:1 ===== */
+.jd-slide { position:relative; display:flex; flex-direction:column; box-sizing:border-box; width:1231px; height:1731px; padding:40px;
+  background:var(--neutral-0); font-family:var(--font-blackbird); color:var(--carousel-ink); overflow:hidden; }
+.jd-slide *, .jd-slide *::before, .jd-slide *::after { box-sizing:border-box; }
+.jd-slide__card { position:relative; display:flex; flex-direction:column; flex:1 1 auto; min-height:0; padding:80px;
+  background:var(--carousel-card); border-radius:var(--radius-slide, 50px); }
+.jd-slide__head { display:flex; justify-content:space-between; align-items:flex-start; gap:var(--space-6); min-height:80px; }
+.jd-slide__head .jd-tag--lg { margin-top:1px; }
+.jd-slide__meta { margin:-3px 0 0; display:flex; flex-direction:column; text-align:right; max-width:520px;
+  font-family:var(--font-sans); font-size:36px; line-height:41px; font-weight:400; letter-spacing:0.01em; color:var(--carousel-ink); }
+.jd-slide__foot { display:flex; align-items:center; justify-content:space-between; }
+.jd-slide__sign { display:flex; align-items:center; gap:24px; }
+.jd-mark { display:block; flex:none; }
+.jd-slide__handle { font-size:36px; line-height:44px; }
+.jd-slide__swipe { display:inline-flex; align-items:center; gap:10px; font-size:50px; line-height:60px; letter-spacing:-0.01em; }
+.jd-slide__swipe .jd-icon { margin-top:4px; }
+
+/* CoverCard: the card fills the page; footer inside it. */
+.jd-cover .jd-slide__foot { margin-top:auto; padding-bottom:0; color:var(--carousel-accent); }
+.jd-cover__body { margin:auto 0; padding-top:40px; }
+.jd-cover__title { margin:0; font-size:109px; line-height:106px; font-weight:400; letter-spacing:-0.01em; color:var(--carousel-accent);
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; padding-bottom:12px; }
+.jd-cover__title u { text-decoration-thickness:5px; text-underline-offset:14px; text-decoration-skip-ink:none; }
+.jd-cover__summary { margin:20px 0 0; max-width:991px; font-family:var(--font-sans); font-size:50px; line-height:67px; font-weight:400;
+  color:var(--carousel-ink); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.jd-cover--ink .jd-slide__card { background:var(--carousel-ink); }
+.jd-cover--blue .jd-slide__card { background:var(--carousel-accent); }
+.jd-cover--yellow .jd-slide__card { background:var(--carousel-highlight); }
+.jd-cover--ink .jd-slide__meta, .jd-cover--blue .jd-slide__meta,
+.jd-cover--ink .jd-cover__title, .jd-cover--blue .jd-cover__title { color:var(--carousel-highlight); }
+.jd-cover--ink .jd-cover__summary, .jd-cover--blue .jd-cover__summary,
+.jd-cover--ink .jd-slide__foot, .jd-cover--blue .jd-slide__foot { color:var(--neutral-0); }
+
+/* SlideCard: card 1151 x 1507, footer on white below it. */
+.jd-slide--inner { padding-bottom:0; }
+.jd-slide--inner .jd-slide__card { flex:none; height:1507px; }
+.jd-slide__title { margin:153px 0 0; display:flex; flex-direction:column; font-size:80px; line-height:80px; font-weight:400;
+  letter-spacing:-0.01em; color:var(--carousel-ink); }
+.jd-slide__title-accent { color:var(--carousel-accent); }
+.jd-slide__summary { margin:18px 0 0; font-family:var(--font-sans); font-size:40px; line-height:49px; font-weight:400; color:var(--carousel-summary);
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.jd-slide__visual { flex:1 1 auto; min-height:0; margin-top:34px; display:flex; flex-direction:column; align-items:stretch; }
+.jd-slide--inner .jd-slide__foot { flex:1 1 auto; padding:0 40px 10px; }
+.jd-slide--inner .jd-slide__sign .jd-mark { color:var(--carousel-accent); }
+.jd-slide--inner .jd-slide__handle { color:var(--carousel-handle); }
+.jd-slide--inner .jd-slide__swipe { color:var(--carousel-accent); }
+
+/* StatCard / StatGrid (Template-1, Template-2). */
+.jd-statgrid { display:flex; flex-direction:column; gap:24px; margin-top:28px; }
+.jd-statgrid__row { display:flex; gap:24px; }
+.jd-stat { flex:1 1 0; min-width:0; height:221px; padding:0 40px; display:flex; flex-direction:column; justify-content:center;
+  border-radius:var(--radius-tile, 16px); background:var(--neutral-0); color:var(--carousel-ink); font-family:var(--font-blackbird); }
+.jd-stat__value { font-size:100px; line-height:110px; letter-spacing:-0.02em; white-space:nowrap; }
+.jd-stat__label { font-size:32px; line-height:39px; margin-top:-2px; }
+.jd-stat--ink { background:var(--carousel-ink); color:var(--neutral-0); }
+.jd-stat--blue { background:var(--carousel-accent); color:var(--neutral-0); }
+.jd-stat--yellow { background:var(--carousel-highlight); color:var(--carousel-ink); }
+
+/* ComparisonBars (Template-3) / ProgressBars (Template-6, 7). Label column 231px, bar area 606px, value 16px after. */
+.jd-bars { display:flex; flex-direction:column; gap:44px; margin-top:48px; color:var(--carousel-data-ink); }
+.jd-bars__row { display:grid; grid-template-columns:231px 606px auto; align-items:center; }
+.jd-bars__label { font-family:var(--font-sans); font-size:32px; line-height:39px; font-weight:600; }
+.jd-bars__value { font-family:var(--font-blackbird); font-size:32px; line-height:39px; white-space:nowrap; }
+.jd-bars--compare .jd-bars__row { grid-template-columns:231px 1fr; }
+.jd-bars__pair { display:flex; flex-direction:column; gap:8px; }
+.jd-bars__line { display:flex; align-items:center; gap:16px; width:606px; }
+.jd-bars__bar { flex:none; display:block; height:50px; min-width:16px; max-width:606px; border-radius:var(--radius-tile, 16px); }
+.jd-bars__bar--a { background:var(--carousel-accent); }
+.jd-bars__bar--b { background:var(--neutral-0); }
+.jd-bars--progress { gap:44px; margin-top:48px; }
+.jd-bars__track { position:relative; display:block; height:78px; border-radius:var(--radius-tile, 16px); background:var(--neutral-0); overflow:hidden; }
+.jd-bars__fill { position:absolute; left:0; top:0; bottom:0; border-radius:var(--radius-tile, 16px); min-width:16px; }
+.jd-bars--brand .jd-bars__fill { background:var(--brand-fill); }
+.jd-bars--highlight .jd-bars__fill { background:var(--carousel-highlight); }
+.jd-bars--progress .jd-bars__value { padding-left:16px; }
+
+/* CarouselImage (Template-5). */
+.jd-slideimg { position:relative; height:637px; background:var(--carousel-placeholder); overflow:hidden; display:flex; align-items:center; justify-content:center; }
+.jd-slideimg img { width:100%; height:100%; object-fit:cover; display:block; }
+.jd-slideimg__ph { font-family:var(--font-blackbird); font-size:72px; line-height:80px; color:var(--carousel-ink); }
+
+/* Carousel: a snapping, swipeable row of slides, scaled down. */
+.jd-carousel-strip { display:flex; flex-direction:column; gap:var(--space-4); font-family:var(--font-sans); }
+.jd-carousel-strip__track { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; scroll-padding:0; padding-bottom:var(--space-2);
+  -webkit-overflow-scrolling:touch; scrollbar-width:thin; }
+.jd-carousel-strip__slide { flex:none; scroll-snap-align:start; overflow:hidden; border-radius:12px; box-shadow:var(--shadow-sm); }
+.jd-carousel-strip__nav { display:flex; align-items:center; gap:var(--space-3); }
+.jd-carousel-strip__btn { display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px; border-radius:var(--radius-full);
+  border:1px solid var(--border-strong); background:var(--surface); color:var(--ink); cursor:pointer; }
+.jd-carousel-strip__btn--prev .jd-icon { transform:rotate(180deg); }
+.jd-carousel-strip__btn:disabled { opacity:.35; cursor:default; }
+.jd-carousel-strip__btn:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
+.jd-carousel-strip__count { font-size:14px; line-height:20px; color:var(--ink-muted); font-variant-numeric:tabular-nums; }
