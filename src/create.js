@@ -6,7 +6,9 @@
 
 import { composePost, linkedInShareUrl, LINKEDIN_MAX_CHARS } from './parser.js';
 import { $, esc, toast, copy, linkedinIcon } from './ui.js';
-import { postFromText } from './autolayout.js';
+import { postFromText, analyzeText, clip } from './autolayout.js';
+import { builtinPost, customPost, BUILTIN_TEMPLATES } from './templates.js';
+import { getKit, getCustomTemplate, setTemplateContent } from './kit.js';
 import {
   normalizePost,
   emptyVisual,
@@ -24,7 +26,7 @@ const HISTORY_KEY = 'posty:created:v1';
 const CODE_KEY = 'posty:access-code';
 const MAX_HISTORY = 20;
 
-const FORMAT_LABELS = { carousel: 'Carrusel', card: 'Card', slide: 'Card única (carrusel)' };
+const FORMAT_LABELS = { carousel: 'Carrusel', card: 'Card', slide: 'Card única (carrusel)', custom: 'Plantilla propia' };
 const TONE_LABELS = { blue: 'Azul', ink: 'Negro', grey: 'Gris', yellow: 'Amarillo' };
 const VISUAL_LABELS = { none: 'Sin gráfico', stats: 'Cifras', bars: 'Barras', venn: 'Venn', image: 'Imagen' };
 
@@ -60,6 +62,7 @@ const state = {
   editing: false,
   snapshot: null, // copia del post al entrar a editar, para "Volver sin guardar"
   isNew: false, // post todavía no guardado (pegado o desde cero)
+  templateEdit: null, // id de plantilla integrada cuyo contenido por defecto se está editando
   needsCode: false,
 };
 
@@ -125,30 +128,22 @@ function newMeta(extra = {}) {
   return { id: `post-${Date.now()}`, createdAt: new Date().toISOString(), prompt: '', ...extra };
 }
 
-function blankPost(format) {
-  const base = { ...newMeta(), format, text: '', hashtags: [] };
-  if (format === 'card') {
-    return normalizePost({
-      ...base,
-      title: 'Nueva card',
-      card: { headline: 'Tu titular con una frase destacada', highlight: 'frase destacada', lead: 'Una línea de apoyo.', items: [{ title: 'Primer punto', description: 'Una idea en una o dos líneas.' }] },
-    });
-  }
-  if (format === 'slide') {
-    return normalizePost({
-      ...base,
-      title: 'Nueva card única',
-      style: 'slide',
-      cover: { tone: 'blue', tag: 'ux', title: 'Tu titular', underline: '', summary: 'Una línea de apoyo.' },
-      slide: { tag: 'ux', title: 'Tu titular', titleAccent: 'en dos lineas', summary: 'Explica la idea en una o dos frases.', visual: emptyVisual() },
-    });
-  }
-  return normalizePost({
-    ...base,
-    title: 'Nuevo carrusel',
-    cover: { tone: 'blue', tag: 'ux', title: 'Tu titular de portada', underline: 'portada', summary: 'De qué va el carrusel.' },
-    slides: [{ tag: 'idea', title: 'Primera idea', titleAccent: 'en dos lineas', summary: 'Explica la idea en una o dos frases.', visual: emptyVisual() }],
-  });
+// Post nuevo "desde cero": parte del contenido de la plantilla (editable en Diseños).
+const DEFAULT_TEMPLATE = { card: 'card-list', slide: 'slide-text', carousel: 'carousel' };
+
+function blankPost(format, templateId) {
+  const sample = format === 'custom' ? customPost(templateId) : builtinPost(DEFAULT_TEMPLATE[format]);
+  return normalizePost({ ...sample, ...newMeta(), title: sample.title || 'Nuevo post' });
+}
+
+// Texto pegado → capas de una plantilla propia: la primera capa recibe el gancho y la segunda el resto.
+function customFromText(text, templateId) {
+  const post = customPost(templateId);
+  const a = analyzeText(text);
+  const [first, second] = getCustomTemplate(templateId).layers;
+  if (first) post.fields[first.id] = clip(a.hook, 90);
+  if (second) post.fields[second.id] = clip(a.restSentences.slice(0, 2).join(' '), 200);
+  return normalizePost({ ...post, ...newMeta(), text: a.text, hashtags: a.hashtags, title: clip(a.hook, 50) });
 }
 
 // Campos editables: ruta dentro del post → valor. Las rutas usan puntos ("slides.0.title").
@@ -255,6 +250,15 @@ function renderFormatQuestion() {
          <strong>Card con lista</strong>
          <span>Titular y lista numerada</span>
        </button>
+       ${getKit()
+         .customTemplates.map(
+           (t) => `<button class="format-option" data-create-action="format" data-format="custom" data-template="${esc(t.id)}">
+             <span class="format-thumb thumb-custom" aria-hidden="true"><i style="background:${esc(t.background)}"></i></span>
+             <strong>${esc(t.name)}</strong>
+             <span>Plantilla propia</span>
+           </button>`,
+         )
+         .join('')}
      </div>`,
   );
 }
@@ -328,6 +332,19 @@ function slideFields(prefix, dataIndex) {
 }
 
 function renderGraphicEditor(post) {
+  if (post.format === 'custom') {
+    const tpl = getCustomTemplate(post.templateId);
+    if (!tpl) return '<p class="error-text">La plantilla de este post se borró en Diseños.</p>';
+    return `
+      <fieldset class="ed-group">
+        <legend>${esc(tpl.name)}</legend>
+        ${tpl.layers
+          .map(
+            (l) => `<label class="ed-field"><span>${esc(l.name)}</span><textarea data-field="fields.${esc(l.id)}" rows="2">${esc(post.fields[l.id] ?? '')}</textarea></label>`,
+          )
+          .join('')}
+      </fieldset>`;
+  }
   if (post.format === 'card') {
     return `
       <fieldset class="ed-group">
@@ -376,22 +393,22 @@ function renderGraphicEditor(post) {
     ${post.slides.length < 8 ? '<button class="btn ghost small" data-create-action="add-slide">+ Añadir slide</button>' : ''}`;
 }
 
-function renderEditor(post) {
-  return `
-    <div class="editor-panel">
-      <fieldset class="ed-group">
+function renderEditor(post, { template = false } = {}) {
+  // Al editar una plantilla solo importa la gráfica; el texto del post se escribe al usarla.
+  const textGroup = template
+    ? ''
+    : `<fieldset class="ed-group">
         <legend>Texto del post</legend>
         ${field('Título interno', 'title')}
         <label class="ed-field"><span>Texto para LinkedIn</span><textarea data-field="text" rows="8">${esc(post.text)}</textarea></label>
         <label class="ed-field"><span>Hashtags</span><input type="text" data-hashtags value="${esc(post.hashtags.join(' '))}" placeholder="#ProductDesign #UX" /></label>
-      </fieldset>
-      ${renderGraphicEditor(post)}
-    </div>`;
+      </fieldset>`;
+  return `<div class="editor-panel">${textGroup}${renderGraphicEditor(post)}</div>`;
 }
 
 function renderPreview(post) {
   const count = post.format === 'carousel' ? 1 + post.slides.length : 1;
-  const frames = Array.from({ length: count }, () => frameHtml(post.format));
+  const frames = Array.from({ length: count }, () => frameHtml(post));
   return post.format === 'carousel'
     ? `<div class="gen-gallery">${frames.map((f) => `<div class="gen-slide">${f}</div>`).join('')}</div>`
     : `<div class="gen-single">${frames[0]}</div>`;
@@ -407,10 +424,11 @@ function renderResult(post) {
       <article class="post gen-post gen-editing status-aprobado">
         <div class="edit-bar">
           <button class="btn ghost small" data-create-action="cancel-edit">← Volver sin guardar</button>
-          <strong>Editar ${FORMAT_LABELS[post.format].toLowerCase()}</strong>
-          <button class="btn primary small" data-create-action="done-edit">Guardar</button>
+          <strong>${state.templateEdit ? `Plantilla: ${esc(BUILTIN_TEMPLATES.find((t) => t.id === state.templateEdit)?.name || '')}` : `Editar ${FORMAT_LABELS[post.format].toLowerCase()}`}</strong>
+          <button class="btn primary small" data-create-action="done-edit">${state.templateEdit ? 'Guardar plantilla' : 'Guardar'}</button>
         </div>
-        <div class="edit-layout">${renderEditor(post)}<div class="edit-preview">${preview}</div></div>
+        ${state.templateEdit ? '<p class="muted small template-note">Este es el contenido con el que empieza la plantilla al usarla en Crear post o al empezar desde cero.</p>' : ''}
+        <div class="edit-layout">${renderEditor(post, { template: Boolean(state.templateEdit) })}<div class="edit-preview">${preview}</div></div>
       </article>`;
   }
 
@@ -584,13 +602,28 @@ async function generate() {
 }
 
 // Crea el post del formato elegido según el modo (pegar texto o desde cero).
-function createLocal(format) {
+function createLocal(format, templateId) {
   state.format = format;
-  if (state.mode === 'paste') {
+  if (format === 'custom') {
+    const post = state.mode === 'paste' ? customFromText(state.prompt, templateId) : blankPost('custom', templateId);
+    showResult(post, { editing: true, isNew: true });
+  } else if (state.mode === 'paste') {
     showResult(normalizePost({ ...postFromText(state.prompt, format), ...newMeta() }), { editing: true, isNew: true });
   } else {
     showResult(blankPost(format), { editing: true, isNew: true });
   }
+}
+
+// Desde Diseños: crear un post a partir de una plantilla.
+export function startFromTemplate(post) {
+  Object.assign(state, { mode: 'manual', prompt: '', templateEdit: null });
+  showResult(normalizePost({ ...post, ...newMeta() }), { editing: true, isNew: true });
+}
+
+// Desde Diseños: editar el contenido por defecto de una plantilla integrada.
+export function editTemplate(id) {
+  Object.assign(state, { mode: 'manual', prompt: '', templateEdit: id });
+  showResult(normalizePost(builtinPost(id)), { editing: true, isNew: false });
 }
 
 function resetToStart() {
@@ -615,10 +648,14 @@ async function handle(btn) {
       createLocal(state.format);
       break;
     case 'format':
-      if (state.mode === 'ai') {
+      if (state.mode === 'ai' && btn.dataset.format !== 'custom') {
         state.format = btn.dataset.format;
         generate();
-      } else createLocal(btn.dataset.format);
+      } else {
+        // Las plantillas propias no pasan por Claude: con un pedido a Claude se usa como texto pegado.
+        if (state.mode === 'ai') state.mode = 'paste';
+        createLocal(btn.dataset.format, btn.dataset.template);
+      }
       break;
     case 'back':
       state.step = 'prompt';
@@ -682,7 +719,11 @@ async function handle(btn) {
       renderCreate();
       break;
     case 'cancel-edit':
-      if (state.isNew) {
+      if (state.templateEdit) {
+        state.templateEdit = null;
+        resetToStart();
+        location.hash = '#/disenos';
+      } else if (state.isNew) {
         // Nunca se guardó: volver al inicio sin dejar rastro.
         state.step = 'prompt';
         state.result = null;
@@ -696,6 +737,15 @@ async function handle(btn) {
       }
       break;
     case 'done-edit':
+      if (state.templateEdit) {
+        const { id, createdAt, prompt, templateId, ...content } = post;
+        setTemplateContent(state.templateEdit, content);
+        toast('Plantilla guardada');
+        state.templateEdit = null;
+        resetToStart();
+        location.hash = '#/disenos';
+        break;
+      }
       state.editing = false;
       state.isNew = false;
       saveToHistory(post);

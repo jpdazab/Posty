@@ -2,6 +2,8 @@ import { parseWeek, composePost, linkedInShareUrl, splitList, LINKEDIN_MAX_CHARS
 import { STATUSES, getPostState, getStatus, updatePost, exportState, importState } from './store.js';
 import { $, esc, toast, copy, linkedinIcon } from './ui.js';
 import { initCreatePage, renderCreate } from './create.js';
+import { initDesignsPage, renderDesigns } from './designs.js';
+import { initKit } from './kit.js';
 
 // Todas las propuestas de la carpeta /propuestas se incluyen al compilar.
 const files = import.meta.glob('../propuestas/*.md', { query: '?raw', import: 'default', eager: true });
@@ -469,7 +471,7 @@ $('#import-input').addEventListener('change', async (e) => {
 
 // ---------- Navegación ----------
 
-const ROUTES = ['digest', 'crear'];
+const ROUTES = ['digest', 'crear', 'disenos'];
 
 function route() {
   const name = location.hash.replace(/^#\/?/, '');
@@ -485,13 +487,18 @@ function showRoute() {
     if (active) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   }
-  document.title = current === 'crear' ? 'Crear post · Posty' : 'AI Digest · Posty';
+  document.title = { crear: 'Crear post', disenos: 'Diseños', digest: 'AI Digest' }[current] + ' · Posty';
   if (current === 'crear') renderCreate();
+  if (current === 'disenos') renderDesigns();
   window.scrollTo(0, 0);
 }
 
 window.addEventListener('hashchange', showRoute);
 
 initCreatePage();
+initDesignsPage();
 render();
-showRoute();
+// Las fuentes, el logo y los fondos subidos se cargan desde IndexedDB antes de dibujar las gráficas.
+initKit()
+  .catch((err) => console.error('No se pudo cargar el kit de diseño', err))
+  .finally(showRoute);

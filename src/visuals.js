@@ -5,6 +5,9 @@
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { React, Jpdazab as J, lockupUrl } from './ds/index.js';
+import { getKit, getCustomTemplate } from './kit.js';
+import { cachedAssetUrl } from './assets-db.js';
+import { customSize } from './templates.js';
 
 const h = React.createElement;
 
@@ -13,6 +16,17 @@ export const SIZES = {
   carousel: { w: 1231, h: 1731 },
   slide: { w: 1231, h: 1731 },
 };
+
+export function sizeOf(post) {
+  if (post.format === 'custom') return customSize(getCustomTemplate(post.templateId));
+  return SIZES[post.format];
+}
+
+// Firma y "Swipe" configurables en Diseños.
+function footProps(last) {
+  const { handle, swipe } = getKit().theme;
+  return { handle: handle || '@jpdazab', swipe: last ? false : swipe || 'Swipe' };
+}
 
 export const COVER_TONES = ['blue', 'ink', 'grey', 'yellow'];
 export const VISUAL_KINDS = ['none', 'stats', 'bars', 'venn', 'image'];
@@ -39,6 +53,8 @@ export function normalizePost(post) {
       lead: c.lead || '',
       items: (c.items || []).map((it) => (typeof it === 'string' ? { title: it, description: '' } : { title: it.title || '', description: it.description || '' })),
     };
+  } else if (p.format === 'custom') {
+    p.fields = { ...(p.fields || {}) };
   } else if (p.format === 'slide') {
     p.style = p.style === 'cover' ? 'cover' : 'slide';
     p.cover = { tone: 'blue', tag: '', title: '', underline: '', summary: '', ...(p.cover || {}) };
@@ -73,7 +89,7 @@ function SocialPost({ card }) {
     { className: 'ds ds-post' },
     h('div', { className: 'ds-post-head' }, h('h2', { className: 'ds-post-headline' }, title), card.lead && h('p', { className: 'ds-post-lead' }, card.lead)),
     items.length > 0 && h(J.NumberedCardList, { items }),
-    h('img', { className: 'ds-post-lockup', src: lockupUrl, alt: 'JD /jpdazab', height: 55 }),
+    h('img', { className: 'ds-post-lockup', src: cachedAssetUrl(getKit().theme.logoAssetId) || lockupUrl, alt: 'Logo', height: 55 }),
   );
 }
 
@@ -117,7 +133,7 @@ function Cover({ cover, last = false }) {
     'div',
     { className: 'ds ds-page' },
     h(J.CoverCard, {
-      swipe: last ? false : undefined,
+      ...footProps(last),
       tone: cover.tone,
       tag: cover.tag || undefined,
       title: underlined(cover.title, cover.underline),
@@ -137,9 +153,38 @@ function Slide({ slide, last }) {
         title: slide.title,
         titleAccent: slide.titleAccent || undefined,
         summary: slide.summary || undefined,
-        swipe: last ? false : undefined,
+        ...footProps(last),
       },
       h(SlideVisual, { visual: slide.visual }),
+    ),
+  );
+}
+
+// Plantilla propia: fondo (color o imagen) y capas de texto posicionadas en píxeles.
+function CustomTemplate({ post }) {
+  const tpl = getCustomTemplate(post.templateId);
+  if (!tpl) return h('div', { className: 'ds ds-missing' }, 'Esta plantilla ya no existe');
+  const { w, h: height } = customSize(tpl);
+  const bg = cachedAssetUrl(tpl.bgAssetId);
+  return h(
+    'div',
+    {
+      className: 'ds ds-custom',
+      style: { width: w, height, backgroundColor: tpl.background, backgroundImage: bg ? `url("${bg}")` : 'none' },
+    },
+    tpl.layers.map((l) =>
+      h(
+        'div',
+        {
+          key: l.id,
+          className: 'ds-layer',
+          style: {
+            left: l.x, top: l.y, width: l.w, fontSize: l.size, color: l.color, fontWeight: l.weight, textAlign: l.align,
+            lineHeight: l.lineHeight || 1.2, fontFamily: `"${l.font}", var(--font-sans)`,
+          },
+        },
+        post.fields?.[l.id] ?? l.sample ?? '',
+      ),
     ),
   );
 }
@@ -147,6 +192,7 @@ function Slide({ slide, last }) {
 // Lista de elementos React, uno por imagen exportable.
 export function pages(post) {
   if (post.format === 'card') return [h(SocialPost, { card: post.card })];
+  if (post.format === 'custom') return [h(CustomTemplate, { post })];
   if (post.format === 'slide') {
     return [post.style === 'cover' ? h(Cover, { cover: post.cover, last: true }) : h(Slide, { slide: post.slide, last: true })];
   }
@@ -160,7 +206,7 @@ const roots = new WeakMap();
 
 // Renderiza las páginas en los contenedores .visual-frame de `container` (uno por página).
 export function mountPages(container, post) {
-  const size = SIZES[post.format];
+  const size = sizeOf(post);
   const els = pages(post);
   const frames = [...container.querySelectorAll('.visual-frame')];
   frames.forEach((frame, i) => {
@@ -184,8 +230,8 @@ export function unmountPages(container) {
   }
 }
 
-export function frameHtml(format) {
-  const { w, h: height } = SIZES[format];
+export function frameHtml(formatOrPost) {
+  const { w, h: height } = typeof formatOrPost === 'string' ? SIZES[formatOrPost] : sizeOf(formatOrPost);
   return `<div class="visual-frame" style="aspect-ratio:${w} / ${height}"><div class="visual-scale"></div></div>`;
 }
 
@@ -210,7 +256,7 @@ async function renderPng(node) {
   }
   const w = node.offsetWidth;
   const height = node.offsetHeight;
-  return toPng(node, { width: w, height, pixelRatio: 1, cacheBust: true, style: { transform: 'none' } });
+  return toPng(node, { width: w, height, pixelRatio: 1, cacheBust: false, style: { transform: 'none' } });
 }
 
 function download(href, name) {

@@ -1,6 +1,6 @@
 # Posty
 
-Panel para revisar, organizar y publicar en LinkedIn los posts que prepara Claude. Tiene dos páginas
+Panel para revisar, organizar y publicar en LinkedIn los posts que prepara Claude. Tiene tres páginas
 en el menú lateral:
 
 - **AI Digest**: las propuestas semanales (ver abajo).
@@ -14,6 +14,19 @@ en el menú lateral:
   slide con cifras, barras, Venn o **imagen**) y **card con lista**. Las gráficas usan el design system
   jpdazab y se editan con vista previa en vivo; "Volver sin guardar" descarta los cambios. Se descargan
   en PNG (y el carrusel en PDF). Los últimos 20 posts quedan en el navegador y se pueden borrar.
+
+- **Diseños**:
+  - **Plantillas**: todas las plantillas con vista previa (card con lista, portadas, slides de texto,
+    cifras, barras, Venn e imagen, y el carrusel completo). "Usar" crea un post; "Editar" cambia el
+    contenido con el que empieza la plantilla; "Restablecer" lo devuelve al original.
+  - **Mis plantillas**: plantillas propias con fondo (color o imagen, por ejemplo exportada de Figma)
+    y capas de texto con posición, tamaño, color, tipografía, peso y alineación.
+  - **Colores y tipografía**: cambia los colores del design system, sube tipografías (WOFF2, WOFF,
+    TTF, OTF) y asígnalas a texto, titulares o monoespaciada, cambia la firma, el texto "Swipe" y el logo.
+  - **Exportar / importar kit**: un JSON con todo lo anterior (incluidos los archivos) para llevarlo
+    a otro navegador.
+
+  El kit se guarda en el navegador: la configuración en localStorage y los archivos en IndexedDB.
 
 ## Cómo funciona
 
