@@ -12,5 +12,10 @@
   },
   "devDependencies": {
     "vite": "^6.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "html-to-image": "^1.11.13",
+    "jspdf": "^4.2.1"
   }
 }

@@ -4,39 +4,67 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
-    <title>Posty · Propuestas LinkedIn</title>
+    <title>Posty</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a66c2'/%3E%3Ctext x='16' y='23' font-family='Arial' font-weight='700' font-size='19' fill='white' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div class="brand">
-        <span class="logo">P</span>
-        <div>
-          <h1>Posty</h1>
-          <p>Propuestas semanales para LinkedIn</p>
+    <div class="app">
+      <aside class="sidebar" aria-label="Navegación principal">
+        <div class="brand">
+          <span class="logo">P</span>
+          <div>
+            <strong>Posty</strong>
+            <span>LinkedIn studio</span>
+          </div>
         </div>
-      </div>
-      <div class="topbar-actions">
-        <button class="btn ghost" id="export-btn" title="Descargar respaldo del estado">Exportar</button>
-        <label class="btn ghost" title="Restaurar respaldo">
-          Importar
-          <input type="file" id="import-input" accept="application/json" hidden />
-        </label>
-      </div>
-    </header>
 
-    <main class="container">
-      <section class="stats" id="stats"></section>
-      <section id="next-up"></section>
+        <nav class="nav">
+          <a class="nav-item" href="#/digest" data-route="digest">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <span>AI Digest</span>
+            <span class="nav-count" id="nav-digest-count"></span>
+          </a>
+          <a class="nav-item" href="#/crear" data-route="crear">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M19 16v4M17 18h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <span>Crear post</span>
+          </a>
+        </nav>
 
-      <section class="toolbar">
-        <div class="filters" id="filters" role="tablist"></div>
-        <input type="search" id="search" placeholder="Buscar en los posts…" aria-label="Buscar" />
-      </section>
+        <div class="sidebar-foot">
+          <button class="nav-item small" id="export-btn" title="Descargar respaldo del estado">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Exportar</span>
+          </button>
+          <label class="nav-item small" title="Restaurar respaldo">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V9m0 0l-4 4m4-4l4 4M5 4h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Importar</span>
+            <input type="file" id="import-input" accept="application/json" hidden />
+          </label>
+        </div>
+      </aside>
 
-      <section id="weeks"></section>
-    </main>
+      <main class="content">
+        <div class="page" id="page-digest" data-page="digest">
+          <header class="page-head">
+            <h1>AI Digest</h1>
+            <p class="muted">Las propuestas semanales que prepara Claude, listas para revisar y publicar.</p>
+          </header>
+
+          <section class="stats" id="stats"></section>
+          <section id="next-up"></section>
+
+          <section class="toolbar">
+            <div class="filters" id="filters" role="tablist"></div>
+            <input type="search" id="search" placeholder="Buscar en los posts…" aria-label="Buscar" />
+          </section>
+
+          <section id="weeks"></section>
+        </div>
+
+        <div class="page" id="create-root" data-page="crear" hidden></div>
+      </main>
+    </div>
 
     <dialog id="publish-dialog">
       <form method="dialog" class="dialog-body">
