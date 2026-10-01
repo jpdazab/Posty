@@ -4,7 +4,7 @@
 import { $, esc, toast } from './ui.js';
 import { BUILTIN_TEMPLATES, builtinPost, customPost, customSize } from './templates.js';
 import { normalizePost, mountPages, unmountPages, frameHtml, fitVisuals } from './visuals.js';
-import { assetUrl, deleteAsset } from './assets-db.js';
+import { assetUrl, deleteAsset, dataUrlToBlob } from './assets-db.js';
 import {
   getKit,
   updateKit,
@@ -26,11 +26,16 @@ import {
   importKit,
   setDraftTemplate,
   DRAFT_ID,
+  setTempTemplates,
 } from './kit.js';
 import { startFromTemplate, editTemplate } from './create.js';
+import { contentFromText, contentFromPage, designsFrom } from './layouts.js';
+import { getBackend } from './backend.js';
 import { brandPreview, logoFields, colorFields, fontFields, brandInput, brandChange, brandClick, loadLogoColors, showWizard, syncBrandFields } from './wizard.js';
 
+// gen: panel "Generar diseños" → { source: 'url' | 'text', url, text, size, siteColors, loading, error, page, results }
 const ui = {
+  gen: null,
   tab: 'plantillas', // plantillas | marca
   draft: null, // plantilla propia en edición
 };
@@ -51,8 +56,74 @@ function templateCard({ key, name, description, badge, actions }) {
     </article>`;
 }
 
+// ---------- Generar diseños (desde una URL o un texto, sin IA) ----------
+
+function renderGenerator() {
+  const g = ui.gen;
+  if (!g) {
+    return `<div class="gen-cta"><div><strong>¿No sabes por dónde empezar?</strong><span class="muted small">Pega un texto o la dirección de un artículo y Posty te propone diseños con tu marca.</span></div>
+      <button class="btn primary" data-design-action="gen-open">✳ Generar diseños</button></div>`;
+  }
+  const colors = g.page?.colors || [];
+  return `
+    <section class="topics-card gen-designs">
+      <div class="topics-head">
+        <div><h2>Generar diseños</h2><p class="muted small">Sin IA: Posty reparte el contenido en varias composiciones con tus colores y tipografías.</p></div>
+        <button class="btn ghost small" data-design-action="gen-close">Cerrar</button>
+      </div>
+      <div class="mode-switch" role="tablist">
+        <button role="tab" class="chip ${g.source === 'url' ? 'active' : ''}" aria-selected="${g.source === 'url'}" data-design-action="gen-source" data-source="url">Desde una URL</button>
+        <button role="tab" class="chip ${g.source === 'text' ? 'active' : ''}" aria-selected="${g.source === 'text'}" data-design-action="gen-source" data-source="text">Desde un texto</button>
+      </div>
+      <form id="gen-form" class="gen-form" novalidate>
+        ${
+          g.source === 'url'
+            ? `<input type="url" data-gen-field="url" value="${esc(g.url)}" placeholder="https://… (un artículo, una noticia, tu web)" inputmode="url" />`
+            : `<textarea data-gen-field="text" rows="6" placeholder="Pega tu post, un párrafo o una lista de ideas. La primera línea será el titular.">${esc(g.text)}</textarea>`
+        }
+        <div class="gen-options">
+          <label class="ed-field"><span>Tamaño</span><select data-gen-field="size">${Object.entries(CUSTOM_SIZES)
+            .map(([key, v]) => `<option value="${key}" ${g.size === key ? 'selected' : ''}>${esc(v.label)}</option>`)
+            .join('')}</select></label>
+          ${
+            g.source === 'url' && colors.length
+              ? `<label class="check"><input type="checkbox" data-gen-field="siteColors" ${g.siteColors ? 'checked' : ''} /> Usar los colores de la web
+                   <span class="swatch-mini">${colors.map((c) => `<i style="background:${esc(c)}"></i>`).join('')}</span></label>`
+              : ''
+          }
+          <button class="btn primary" type="submit" ${g.loading ? 'disabled' : ''}>${g.loading ? 'Leyendo la web…' : 'Generar diseños'}</button>
+        </div>
+        ${g.error ? `<p class="error-text">${esc(g.error)}</p>` : ''}
+      </form>
+      ${
+        g.results?.length
+          ? `<div class="tpl-grid">${g.results
+              .map((t) =>
+                templateCard({
+                  key: `custom:${t.id}`,
+                  name: t.name,
+                  description: customSize(t).label,
+                  actions: `
+                    <button class="btn primary small" data-design-action="gen-use" data-id="${t.id}">Usar en un post</button>
+                    ${g.savedIds?.[t.id] ? '<button class="btn ghost small" disabled>Guardada ✓</button>' : `<button class="btn ghost small" data-design-action="gen-save" data-id="${t.id}">Guardar</button>`}
+                    <button class="btn ghost small" data-design-action="gen-edit" data-id="${t.id}">Editar</button>`,
+                }),
+              )
+              .join('')}</div>`
+          : ''
+      }
+    </section>`;
+}
+
 function renderTemplates() {
   const kit = getKit();
+  const empty = !kit.builtins && !kit.customTemplates.length;
+  // Sin plantillas: el estado vacío ya ofrece generar; con el panel abierto no hace falta repetirlo.
+  if (empty) return ui.gen ? renderGenerator() : renderTemplateList(kit);
+  return renderGenerator() + renderTemplateList(kit);
+}
+
+function renderTemplateList(kit) {
   // Las plantillas de ejemplo (design system jpdazab) solo existen en kits anteriores al asistente.
   const groups = kit.builtins ? [...new Set(BUILTIN_TEMPLATES.map((t) => t.group))] : [];
   if (!kit.builtins && !kit.customTemplates.length) {
@@ -60,8 +131,11 @@ function renderTemplates() {
       <div class="empty-state">
         <span class="empty-icon" aria-hidden="true">+</span>
         <h2>Crea tu primera plantilla</h2>
-        <p class="muted">Empieza con tus colores y tipografías, o sube como fondo un diseño exportado de Figma o Canva y coloca encima las capas de texto.</p>
-        <button class="btn primary" data-design-action="new-custom">Nueva plantilla</button>
+        <p class="muted">Genera diseños desde un texto o una web, empieza con tus colores y tipografías, o sube como fondo un diseño exportado de Figma o Canva.</p>
+        <div class="actions center">
+          <button class="btn primary" data-design-action="gen-open">✳ Generar diseños</button>
+          <button class="btn ghost" data-design-action="new-custom">Nueva plantilla</button>
+        </div>
       </div>`;
   }
   return `
@@ -146,7 +220,13 @@ function renderCustomEditor() {
               <input type="file" accept="image/*" data-tpl-bg />
               <small class="muted">${t.bgAssetId ? 'Imagen cargada. Se ajusta para cubrir todo el tamaño.' : 'Opcional. PNG o JPG del tamaño elegido.'}</small>
             </label>
-            ${t.bgAssetId ? '<button class="btn ghost small" data-design-action="remove-bg">Quitar imagen de fondo</button>' : ''}
+            ${
+              t.bgAssetId
+                ? `<label class="check"><input type="checkbox" data-tpl-overlay ${t.overlay ? 'checked' : ''} /> Oscurecer o teñir la imagen</label>
+                   ${t.overlay ? `<div class="ed-row"><label class="ed-field"><span>Color</span><input type="color" data-tpl="overlay.color" value="${esc(t.overlay.color)}" /></label>${num('Opacidad (0 a 0,9)', 'overlay.opacity', t.overlay.opacity, { min: 0, max: 0.9, step: 0.05 })}</div>` : ''}
+                   <button class="btn ghost small" data-design-action="remove-bg">Quitar imagen de fondo</button>`
+                : ''
+            }
           </fieldset>
           <fieldset class="ed-group">
             <legend>Logo</legend>
@@ -361,6 +441,111 @@ function refreshPreviews() {
   previewTimer = setTimeout(() => mountPreviews($('#designs-root')), 120);
 }
 
+// ---------- Generar diseños: lógica ----------
+
+function authHeaders(backend) {
+  if (backend.mode === 'cloud') return backend.accessToken().then((t) => ({ Authorization: `Bearer ${t}` }));
+  let code = '';
+  try {
+    code = JSON.parse(localStorage.getItem('posty:access-code') || '""');
+  } catch {
+    // sin código
+  }
+  return Promise.resolve({ 'x-posty-code': code });
+}
+
+// La imagen descargada de la web solo se conserva si alguna plantilla guardada la usa.
+function dropGenImage() {
+  const id = ui.gen?.imageAssetId;
+  if (id && !getKit().customTemplates.some((t) => t.bgAssetId === id)) deleteAsset(id).catch(() => {});
+  if (ui.gen) ui.gen.imageAssetId = null;
+}
+
+function buildDesigns() {
+  const g = ui.gen;
+  const { brand, theme } = getKit();
+  const palette = { ...brand.colors };
+  const colors = g.page?.colors || [];
+  if (g.source === 'url' && g.siteColors && colors.length) {
+    palette.primary = colors[0];
+    if (colors[1]) palette.secondary = colors[1];
+  }
+  g.results = designsFrom(g.content, { palette, fonts: brand.fonts, handle: theme.handle, hasLogo: Boolean(theme.logoAssetId), size: g.size });
+  g.savedIds = {};
+  setTempTemplates(g.results);
+}
+
+async function runGenerator() {
+  const g = ui.gen;
+  g.error = null;
+  if (g.source === 'text') {
+    if (!g.text.trim()) {
+      g.error = 'Pega primero un texto.';
+      renderDesigns();
+      return;
+    }
+    g.content = contentFromText(g.text);
+    buildDesigns();
+    renderDesigns();
+    return;
+  }
+  if (!g.url.trim()) {
+    g.error = 'Escribe la dirección de una web.';
+    renderDesigns();
+    return;
+  }
+  g.loading = true;
+  renderDesigns();
+  try {
+    const backend = getBackend();
+    const res = await fetch('/api/url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders(backend)) },
+      body: JSON.stringify({ url: g.url }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || (res.status === 404 ? 'Leer webs solo funciona con Posty desplegado en Vercel.' : 'No se pudo leer esa web.'));
+    dropGenImage();
+    g.page = data;
+    g.siteColors = Boolean(data.colors?.length);
+    g.content = contentFromPage(data);
+    if (data.image) {
+      g.imageAssetId = await storeImage(await dataUrlToBlob(data.image)).catch(() => null);
+      if (g.imageAssetId) await assetUrl(g.imageAssetId);
+      g.content.image = g.imageAssetId;
+    }
+    buildDesigns();
+  } catch (err) {
+    g.error = err.message === 'Failed to fetch' ? 'No hay conexión con el servidor.' : err.message;
+  }
+  g.loading = false;
+  renderDesigns();
+}
+
+// Guarda una propuesta como plantilla propia (una vez) y devuelve su id.
+async function persistGenerated(genId) {
+  const g = ui.gen;
+  if (g.savedIds[genId]) return g.savedIds[genId];
+  const tpl = clone(g.results.find((t) => t.id === genId));
+  tpl.id = newCustomTemplate().id;
+  // Cada plantilla con su propia copia de la imagen: borrar una no rompe las otras.
+  if (tpl.bgAssetId && getKit().customTemplates.some((t) => t.bgAssetId === tpl.bgAssetId)) {
+    const url = await assetUrl(tpl.bgAssetId);
+    tpl.bgAssetId = url ? await storeImage(await (await fetch(url)).blob()) : null;
+    if (tpl.bgAssetId) await assetUrl(tpl.bgAssetId);
+  }
+  saveCustomTemplate(tpl);
+  g.savedIds[genId] = tpl.id;
+  return tpl.id;
+}
+
+function postTextFromSource() {
+  const g = ui.gen;
+  if (g.source === 'text') return g.text.trim();
+  const p = g.page || {};
+  return [p.title, p.description, p.url].filter(Boolean).join('\n\n');
+}
+
 // ---------- Acciones ----------
 
 function setPath(obj, path, value) {
@@ -372,6 +557,39 @@ function setPath(obj, path, value) {
 async function handle(btn) {
   const { designAction: action, id } = btn.dataset;
   switch (action) {
+    case 'gen-open':
+      ui.gen = { source: 'url', url: '', text: '', size: '1080x1350', siteColors: true, loading: false, error: null, page: null, content: null, results: [], savedIds: {} };
+      ui.tab = 'plantillas';
+      renderDesigns();
+      $('#designs-root [data-gen-field="url"]')?.focus();
+      break;
+    case 'gen-close':
+      dropGenImage();
+      setTempTemplates([]);
+      ui.gen = null;
+      renderDesigns();
+      break;
+    case 'gen-source':
+      ui.gen.source = btn.dataset.source;
+      ui.gen.error = null;
+      renderDesigns();
+      break;
+    case 'gen-save':
+      await persistGenerated(id);
+      toast('Plantilla guardada en Mis plantillas');
+      renderDesigns();
+      break;
+    case 'gen-use': {
+      const savedId = await persistGenerated(id);
+      startFromTemplate({ ...customPost(savedId), text: postTextFromSource() });
+      location.hash = '#/crear';
+      break;
+    }
+    case 'gen-edit':
+      ui.draft = clone(ui.gen.results.find((t) => t.id === id));
+      renderDesigns();
+      window.scrollTo(0, 0);
+      break;
     case 'rerun-wizard':
       restartSetup();
       showWizard(afterWizard);
@@ -432,6 +650,17 @@ async function handle(btn) {
       break;
     case 'save-custom': {
       const draft = ui.draft;
+      if (draft.id.startsWith('__gen_')) {
+        const genId = draft.id;
+        ui.gen.results = ui.gen.results.map((t) => (t.id === genId ? draft : t));
+        setTempTemplates(ui.gen.results);
+        ui.draft = null;
+        setDraftTemplate(null);
+        await persistGenerated(genId);
+        toast('Plantilla guardada');
+        renderDesigns();
+        break;
+      }
       ui.draft = null;
       setDraftTemplate(null);
       saveCustomTemplate(draft);
@@ -495,6 +724,19 @@ async function handleChange(e) {
   const el = e.target;
   if (await brandChange(el, rerenderBrand)) return;
   try {
+    if (el.dataset.genField && ui.gen) {
+      const key = el.dataset.genField;
+      ui.gen[key] = el.type === 'checkbox' ? el.checked : el.value;
+      // Cambiar tamaño o colores rehace las propuestas sin volver a leer la web.
+      if ((key === 'size' || key === 'siteColors') && ui.gen.content) buildDesigns();
+      if (key === 'size' || key === 'siteColors') renderDesigns();
+      return;
+    }
+    if (el.dataset.tplOverlay !== undefined) {
+      ui.draft.overlay = el.checked ? { color: '#000000', opacity: 0.45, ...(ui.draft.overlay || {}) } : null;
+      renderDesigns();
+      return;
+    }
     if (el.dataset.tplLogo !== undefined) {
       ui.draft.logo = { x: 80, y: customSize(ui.draft).h - 160, h: 80, ...ui.draft.logo, show: el.checked };
       renderDesigns();
@@ -540,6 +782,10 @@ async function handleChange(e) {
 
 function handleInput(e) {
   const el = e.target;
+  if (el.dataset.genField && ui.gen && el.type !== 'checkbox' && el.tagName !== 'SELECT') {
+    ui.gen[el.dataset.genField] = el.value;
+    return;
+  }
   if (brandInput(el, rerenderBrand)) return;
   if (el.dataset.color) {
     updateKit((k) => (k.theme.colors[el.dataset.color] = el.value));
@@ -569,6 +815,11 @@ export function initDesignsPage() {
     if (!btn) return;
     e.preventDefault();
     handle(btn);
+  });
+  root.addEventListener('submit', (e) => {
+    if (e.target.id !== 'gen-form') return;
+    e.preventDefault();
+    runGenerator();
   });
   root.addEventListener('input', handleInput);
   root.addEventListener('change', handleChange);

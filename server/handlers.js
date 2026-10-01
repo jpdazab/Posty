@@ -5,6 +5,7 @@
 // - POST /api/proposals?week=AAAA-Www            Markdown de la semana (rutina semanal, token personal).
 // - POST /api/proposals?week=AAAA-Www&file=x.png Un archivo de la semana (imagen o PDF).
 // - POST /api/digest     { which, today, extra } Genera las propuestas de una semana con Claude (sesión + límite).
+// - POST /api/url        { url }                  Lee una web (sin IA) para proponer diseños (sesión).
 // - GET  /api/topics                             Temas del AI Digest de la persona (rutina semanal, token personal).
 
 import { createHash } from 'node:crypto';
@@ -13,6 +14,7 @@ import { generatePost, checkAccess, GenerateError } from './generate.js';
 import { parseWeek } from '../src/parser.js';
 import { normalizeSettings, settingsBrief } from '../src/topics-format.js';
 import { generateWeek } from './digest.js';
+import { readUrl } from './url-info.js';
 
 export const MAX_MARKDOWN = 1024 * 1024; // 1 MB
 export const MAX_FILE = 4 * 1024 * 1024; // 4 MB (Vercel admite 4,5 MB por petición)
@@ -84,6 +86,38 @@ export async function handleGenerate(req, deps = {}) {
     if (err instanceof GenerateError) return reply(err.status, { error: err.message });
     console.error(err);
     return reply(500, { error: 'Error inesperado al generar el post.' });
+  }
+}
+
+// ---------- /api/url ----------
+
+// Sesión obligatoria con cuentas, para que nadie use Posty como proxy para leer webs.
+export async function handleUrl(req, deps = {}) {
+  if (req.method !== 'POST') return reply(405, { error: 'Método no permitido' });
+  const db = deps.admin === undefined ? adminClient() : deps.admin;
+  const read = deps.readUrl || readUrl;
+  let body;
+  try {
+    body = JSON.parse(req.body?.toString('utf8') || '{}');
+  } catch {
+    return reply(400, { error: 'La petición no es JSON válido.' });
+  }
+  try {
+    if (db) {
+      const token = bearer(req.headers);
+      if (!token) return reply(401, { error: 'Inicia sesión para leer webs.' });
+      const { data, error } = await db.auth.getUser(token);
+      if (error || !data?.user) return reply(401, { error: 'Tu sesión caducó. Recarga la página.' });
+    } else {
+      checkAccess(req.headers['x-posty-code']);
+    }
+    if (!body.url) return reply(400, { error: 'Escribe la dirección de una web.' });
+    return reply(200, await read(body.url));
+  } catch (err) {
+    if (err instanceof GenerateError) return reply(err.status, { error: err.message });
+    if (err?.name === 'TimeoutError' || err?.name === 'AbortError') return reply(504, { error: 'La web tardó demasiado en responder.' });
+    console.error(err);
+    return reply(502, { error: 'No se pudo leer esa web.' });
   }
 }
 

@@ -51,12 +51,7 @@ function defaultBrand() {
   };
 }
 
-export const CUSTOM_SIZES = {
-  '1080x1350': { w: 1080, h: 1350, label: 'Vertical 4:5 · 1080 × 1350' },
-  '1080x1080': { w: 1080, h: 1080, label: 'Cuadrado · 1080 × 1080' },
-  '1231x1731': { w: 1231, h: 1731, label: 'Carrusel · 1231 × 1731' },
-  '1200x627': { w: 1200, h: 627, label: 'Horizontal · 1200 × 627' },
-};
+export { CUSTOM_SIZES } from './sizes.js';
 
 function defaultKit() {
   return {
@@ -277,8 +272,16 @@ export function setDraftTemplate(tpl) {
   draftTemplate = tpl ? { ...tpl, id: DRAFT_ID } : null;
 }
 
+// Propuestas de "Generar diseños" (aún sin guardar), solo para dibujar su vista previa.
+const tempTemplates = new Map();
+export function setTempTemplates(list) {
+  tempTemplates.clear();
+  for (const t of list) tempTemplates.set(t.id, t);
+}
+
 export function getCustomTemplate(id) {
   if (id === DRAFT_ID) return draftTemplate;
+  if (tempTemplates.has(id)) return tempTemplates.get(id);
   return kit.customTemplates.find((t) => t.id === id) || null;
 }
 

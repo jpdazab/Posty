@@ -30,6 +30,10 @@ Páginas del menú lateral:
   - **Plantillas**: las plantillas propias de cada persona. Las cuentas creadas antes del asistente
     conservan además las plantillas de ejemplo del design system jpdazab (card con lista, portadas,
     slides y carrusel).
+  - **Generar diseños** (sin IA): pegas un texto o la URL de un artículo o web y Posty propone varias
+    composiciones (editorial, bloque de color, cita, lista, dato e imagen) con tus colores y tipografías,
+    ajustando el tamaño del texto para que quepa. De una web toma el título, la descripción, los puntos,
+    sus colores (opcional) y su imagen principal. Cada propuesta se guarda, se edita o se usa en un post.
   - **Mis plantillas**: plantillas propias con fondo (color o imagen, por ejemplo exportada de Figma)
     y capas de texto con posición, tamaño, color, tipografía, peso y alineación.
   - **Colores y tipografía**: los colores, tipografías, firma y logo de la marca (los mismos controles
@@ -95,6 +99,7 @@ Si el design system cambia, vuelve a copiar esos archivos desde el artifact.
     autenticada con el token personal de cada usuario.
   - `POST /api/digest`: genera con Claude las propuestas de una semana con los temas guardados de la persona
     (sesión + `AI_MONTHLY_LIMIT`, un crédito por propuesta). Devuelve el Markdown, que la web guarda como semana.
+  - `POST /api/url`: lee una web (sin IA, solo direcciones públicas) para Generar diseños. Exige sesión.
   - `GET /api/topics`: los temas del digest de la persona del token, en JSON y como texto (`brief`).
 - **Supabase** (`supabase/schema.sql`): tablas con seguridad por usuario y Storage para archivos.
   `supabase/tests/` prueba que cada usuario solo accede a lo suyo.

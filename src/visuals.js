@@ -173,6 +173,7 @@ function CustomTemplate({ post }) {
       className: 'ds ds-custom',
       style: { width: w, height, backgroundColor: tpl.background, backgroundImage: bg ? `url("${bg}")` : 'none' },
     },
+    tpl.overlay && h('div', { key: '__overlay', className: 'ds-overlay', style: { backgroundColor: tpl.overlay.color, opacity: tpl.overlay.opacity } }),
     logo && h('img', { key: '__logo', className: 'ds-layer ds-logo', src: logo, alt: 'Logo', style: { left: tpl.logo.x, top: tpl.logo.y, height: tpl.logo.h } }),
     tpl.layers.map((l) =>
       h(
