@@ -8,7 +8,7 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a66c2'/%3E%3Ctext x='16' y='23' font-family='Arial' font-weight='700' font-size='19' fill='white' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body>
+  <body class="loading">
     <div class="app">
       <aside class="sidebar" aria-label="Navegación principal">
         <div class="brand">
@@ -36,6 +36,10 @@
         </nav>
 
         <div class="sidebar-foot">
+          <a class="nav-item small account-link" href="#/cuenta" data-route="cuenta" title="Cuenta">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <span class="account-label"><span>Cuenta</span><small id="account-email"></small></span>
+          </a>
           <button class="nav-item small" id="export-btn" title="Descargar respaldo del estado">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span>Exportar</span>
@@ -68,6 +72,7 @@
 
         <div class="page" id="create-root" data-page="crear" hidden></div>
         <div class="page page-wide" id="designs-root" data-page="disenos" hidden></div>
+        <div class="page" id="account-root" data-page="cuenta" hidden></div>
       </main>
     </div>
 

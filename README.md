@@ -1,7 +1,10 @@
 # Posty
 
-Panel para revisar, organizar y publicar en LinkedIn los posts que prepara Claude. Tiene tres páginas
-en el menú lateral:
+Panel para revisar, organizar y publicar en LinkedIn los posts que prepara Claude. Es multiusuario:
+cada persona entra con un enlace por email y tiene su propio AI Digest, sus posts, su marca y su rutina
+semanal (ver **[SETUP.md](./SETUP.md)** para configurarlo con Supabase y Vercel).
+
+Páginas del menú lateral:
 
 - **AI Digest**: las propuestas semanales (ver abajo).
 - **Crear post**, con tres modos:
@@ -28,10 +31,12 @@ en el menú lateral:
 
   El kit se guarda en el navegador: la configuración en localStorage y los archivos en IndexedDB.
 
+- **Cuenta**: sesión, uso de Claude del mes, token para la rutina semanal y subida manual de semanas.
+
 ## Cómo funciona
 
-1. **Claude envía las propuestas**: cada semana agrega un archivo `propuestas/AAAA-Www.md`
-   a este repositorio (formato en [`PROPUESTAS.md`](./PROPUESTAS.md)).
+1. **Claude envía las propuestas**: la rutina semanal de cada persona manda el Markdown de la semana
+   (formato en [`PROPUESTAS.md`](./PROPUESTAS.md)) y sus imágenes a `/api/proposals` con su token.
 2. **La plataforma las muestra** agrupadas por semana, con fecha y hora sugeridas, pilar,
    objetivo, formato, idea de imagen y conteo de caracteres (límite de 3.000 de LinkedIn).
 3. **Tú decides** sobre cada post:
@@ -71,20 +76,19 @@ Geist Mono llega desde el paquete `@fontsource/geist-mono`.
 
 Si el design system cambia, vuelve a copiar esos archivos desde el artifact.
 
-## Generador de posts con Claude (opcional)
+## Arquitectura
 
-La página llama a `POST /api/generate` (función de Vercel en `api/generate.js`, lógica en
-`server/generate.js`), que usa la API de Claude con salida estructurada. Variables de entorno en Vercel:
+- **Web** (Vite, `src/`): `backend.js` decide dónde se guardan los datos: Supabase con login
+  (modo cuentas) o el navegador (modo local, sin las variables `VITE_SUPABASE_*`).
+- **Funciones de Vercel** (`api/`, lógica en `server/handlers.js`):
+  - `POST /api/generate`: genera un post con Claude. Exige sesión y aplica `AI_MONTHLY_LIMIT` por persona
+    (si Claude falla, el intento no cuenta).
+  - `POST /api/proposals?week=AAAA-Www[&file=…]`: recibe el Markdown y los archivos de la rutina semanal,
+    autenticada con el token personal de cada usuario.
+- **Supabase** (`supabase/schema.sql`): tablas con seguridad por usuario y Storage para archivos.
+  `supabase/tests/` prueba que cada usuario solo accede a lo suyo.
+- `scripts/upload-week.mjs`: sube una semana desde una carpeta local con el token de una persona.
 
-| Variable | Obligatoria | Para qué |
-| --- | --- | --- |
-| `ANTHROPIC_API_KEY` | Sí | Clave de la API de Anthropic (console.anthropic.com). Cada post cuesta unos céntimos. |
-| `POSTY_ACCESS_CODE` | Recomendada | Código que la web pide la primera vez; evita que otra persona con el enlace gaste tu API key. |
+Variables de entorno: ver [`.env.example`](./.env.example) y [SETUP.md](./SETUP.md).
 
-En local, `npm run dev` sirve la misma API si exportas `ANTHROPIC_API_KEY`.
-
-## Despliegue
-
-Sitio Vite + una función serverless. En Vercel basta con importar el repositorio
-(build: `npm run build`, salida: `dist`) y añadir las variables de entorno de arriba.
-Cada push con una propuesta nueva vuelve a desplegar el sitio automáticamente.
+La carpeta `propuestas/` del repositorio queda como archivo de las primeras semanas: ya no se incluye en la web.

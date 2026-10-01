@@ -1,31 +1,26 @@
 import { parseWeek, composePost, linkedInShareUrl, splitList, LINKEDIN_MAX_CHARS } from './parser.js';
-import { STATUSES, getPostState, getStatus, updatePost, exportState, importState } from './store.js';
+import { STATUSES, getPostState, getStatus, updatePost, exportState, importState, initStore } from './store.js';
 import { $, esc, toast, copy, linkedinIcon } from './ui.js';
-import { initCreatePage, renderCreate } from './create.js';
+import { initCreatePage, renderCreate, initCreateData } from './create.js';
 import { initDesignsPage, renderDesigns } from './designs.js';
 import { initKit } from './kit.js';
+import { initBackend, getBackend, mode as backendMode } from './backend.js';
+import { showLogin } from './auth.js';
+import { initAccountPage, renderAccount } from './account.js';
 
-// Todas las propuestas de la carpeta /propuestas se incluyen al compilar.
-const files = import.meta.glob('../propuestas/*.md', { query: '?raw', import: 'default', eager: true });
+// Propuestas semanales del usuario: Markdown (formato PROPUESTAS.md) + archivos de cada semana.
+let weeks = [];
+let allPosts = [];
+let postsById = new Map();
 
-// Imágenes y PDFs de cada semana viven en propuestas/<archivo-sin-.md>/.
-const assets = import.meta.glob('../propuestas/**/*.{png,jpg,jpeg,webp,gif,pdf}', {
-  query: '?url',
-  import: 'default',
-  eager: true,
-});
-
-const weeks = Object.entries(files)
-  .map(([path, source]) => {
-    const folder = path.split('/').pop().replace(/\.md$/, '');
-    return { ...parseWeek(source, folder), folder };
-  })
-  .sort((a, b) => b.id.localeCompare(a.id));
-
-for (const w of weeks) w.posts = w.posts.map((p) => ({ ...p, week: w }));
-
-const allPosts = weeks.flatMap((w) => w.posts);
-const postsById = new Map(allPosts.map((p) => [p.id, p]));
+export function setWeeks(rows) {
+  weeks = rows
+    .map((row) => ({ ...parseWeek(row.source, row.week), files: row.files || {} }))
+    .sort((a, b) => b.id.localeCompare(a.id));
+  for (const w of weeks) w.posts = w.posts.map((p) => ({ ...p, week: w }));
+  allPosts = weeks.flatMap((w) => w.posts);
+  postsById = new Map(allPosts.map((p) => [p.id, p]));
+}
 
 const PREVIEW_CHARS = 210; // Lo que LinkedIn muestra antes de "…ver más".
 
@@ -158,7 +153,11 @@ function renderWeeks() {
     $('#weeks').innerHTML = `
       <div class="empty-state">
         <h2>Aún no hay propuestas</h2>
-        <p>Cuando Claude agregue un archivo en <code>propuestas/</code> aparecerá aquí. Revisa <code>PROPUESTAS.md</code> para ver el formato.</p>
+        ${
+          backendMode === 'cloud'
+            ? '<p>Cuando tu rutina semanal envíe propuestas aparecerán aquí. También puedes subir una semana a mano desde <a href="#/cuenta">Cuenta</a>.</p>'
+            : '<p>Estás en modo local, sin cuenta: las propuestas semanales necesitan Supabase. Mira <code>SETUP.md</code>.</p>'
+        }
       </div>`;
     return;
   }
@@ -261,7 +260,7 @@ function renderPost(post) {
 }
 
 function assetUrl(post, name) {
-  return assets[`../propuestas/${post.week.folder}/${name}`];
+  return post.week.files[name];
 }
 
 function postMedia(post) {
@@ -287,7 +286,7 @@ function renderMedia(post) {
         </div>` : ''}
       <div class="media-actions">
         ${found.length ? `<button class="btn ghost small" data-action="download-images" data-id="${esc(post.id)}">⬇ ${found.length === 1 ? 'Descargar imagen' : `Descargar ${found.length} imágenes`}</button>` : ''}
-        ${pdf?.url ? `<a class="btn ghost small" href="${esc(pdf.url)}" download="${esc(pdf.name)}">⬇ PDF del carrusel</a>` : ''}
+        ${pdf?.url ? `<button class="btn ghost small" data-action="download-pdf" data-id="${esc(post.id)}">⬇ PDF del carrusel</button>` : ''}
       </div>
       ${missing.length ? `<p class="media-missing">No se encontró: ${missing.map(esc).join(', ')}</p>` : ''}
     </div>`;
@@ -309,10 +308,13 @@ function renderSources(post) {
 function downloadImages(post) {
   postMedia(post).images.filter((i) => i.url).forEach((img, i) => {
     // Pequeña pausa entre descargas para que el navegador no bloquee las siguientes.
-    setTimeout(() => {
+    setTimeout(async () => {
+      // Los archivos vienen de otro dominio (Storage): se descargan como blob para conservar el nombre.
+      const blob = await (await fetch(img.url)).blob();
       const a = document.createElement('a');
-      a.href = img.url;
+      a.href = URL.createObjectURL(blob);
       a.download = img.name;
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -345,6 +347,16 @@ async function handleAction(btn) {
       window.open(linkedInShareUrl(finalText(post)), '_blank', 'noopener');
       await copy(finalText(post));
       openPublishDialog(id);
+      break;
+    }
+    case 'download-pdf': {
+      const { pdf } = postMedia(post);
+      const blob = await (await fetch(pdf.url)).blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = pdf.name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
       break;
     }
     case 'download-images':
@@ -471,7 +483,8 @@ $('#import-input').addEventListener('change', async (e) => {
 
 // ---------- Navegación ----------
 
-const ROUTES = ['digest', 'crear', 'disenos'];
+const ROUTES = ['digest', 'crear', 'disenos', 'cuenta'];
+const TITLES = { crear: 'Crear post', disenos: 'Diseños', digest: 'AI Digest', cuenta: 'Cuenta' };
 
 function route() {
   const name = location.hash.replace(/^#\/?/, '');
@@ -487,18 +500,46 @@ function showRoute() {
     if (active) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   }
-  document.title = { crear: 'Crear post', disenos: 'Diseños', digest: 'AI Digest' }[current] + ' · Posty';
+  document.title = `${TITLES[current]} · Posty`;
   if (current === 'crear') renderCreate();
   if (current === 'disenos') renderDesigns();
+  if (current === 'cuenta') renderAccount();
   window.scrollTo(0, 0);
 }
 
-window.addEventListener('hashchange', showRoute);
+// Vuelve a cargar las semanas (por ejemplo, tras subir una desde Cuenta).
+export async function reloadWeeks() {
+  setWeeks(await getBackend().listWeeks());
+  render();
+}
 
-initCreatePage();
-initDesignsPage();
-render();
-// Las fuentes, el logo y los fondos subidos se cargan desde IndexedDB antes de dibujar las gráficas.
-initKit()
-  .catch((err) => console.error('No se pudo cargar el kit de diseño', err))
-  .finally(showRoute);
+async function start() {
+  const backend = await initBackend();
+  if (!backend) {
+    showLogin();
+    return;
+  }
+  document.body.dataset.mode = backend.mode;
+  if (backend.user) $('#account-email').textContent = backend.user.email;
+  const results = await Promise.allSettled([
+    initStore(),
+    initCreateData(),
+    // Fuentes, logo y fondos subidos se cargan antes de dibujar las gráficas.
+    initKit(),
+    backend.listWeeks().then(setWeeks),
+  ]);
+  const failed = results.filter((r) => r.status === 'rejected');
+  if (failed.length) {
+    console.error(failed.map((r) => r.reason));
+    toast('No se pudieron cargar algunos datos. Recarga la página.');
+  }
+  initCreatePage();
+  initDesignsPage();
+  initAccountPage();
+  render();
+  window.addEventListener('hashchange', showRoute);
+  showRoute();
+  document.body.classList.remove('loading');
+}
+
+start();

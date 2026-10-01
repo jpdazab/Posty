@@ -1,8 +1,8 @@
 # Formato de las propuestas semanales
 
-Cada semana Claude agrega **un archivo** en la carpeta `propuestas/` llamado
-`AAAA-Www.md` (semana ISO), por ejemplo `propuestas/2026-W40.md`.
-Al hacer push, la plataforma lo muestra automáticamente.
+Cada semana la rutina de Claude de cada persona envía **un archivo Markdown** por semana (semana ISO,
+por ejemplo `2026-W42`) y sus imágenes a `/api/proposals` con su token (ver `SETUP.md`, paso 6).
+También se puede subir a mano desde Posty → Cuenta.
 
 ```markdown
 ---
@@ -53,8 +53,8 @@ dia: 2026-10-01
 
 ## Imágenes y PDF
 
-- Las gráficas de la semana van en una carpeta con el **mismo nombre que el archivo**:
-  `propuestas/2026-W42.md` → `propuestas/2026-W42/`.
+- Las gráficas se envían aparte, una petición por archivo (`?week=2026-W42&file=lun-1.png`), con el
+  mismo nombre que aparece en `imagenes:` o `pdf:`. Máximo 4 MB por archivo.
 - `imagenes:` lista de archivos separados por comas, en el orden del carrusel
   (formatos: jpg, png, webp). Recomendado JPEG calidad ~88 para que el repo no crezca demasiado.
 - `pdf:` el PDF del carrusel (LinkedIn publica los carruseles como documento).

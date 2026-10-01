@@ -1,7 +1,9 @@
-// Estado de cada post (aprobado, publicado, ediciones…) guardado en el navegador.
-// Se puede exportar/importar como JSON para respaldarlo o pasarlo a otro equipo.
+// Estado de cada post del AI Digest (aprobado, publicado, ediciones…).
+// Se guarda en la cuenta (Supabase) o en el navegador en modo local (ver backend.js).
+// Se puede exportar/importar como JSON para respaldarlo.
 
-const KEY = 'posty:state:v1';
+import { getBackend } from './backend.js';
+import { toast } from './ui.js';
 
 export const STATUSES = {
   pendiente: { label: 'Pendiente' },
@@ -10,24 +12,20 @@ export const STATUSES = {
   descartado: { label: 'Descartado' },
 };
 
-let state = load();
+let state = {};
 
-function load() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
+export async function initStore() {
+  const loaded = await getBackend().loadStates();
+  state = loaded && typeof loaded === 'object' ? loaded : {};
 }
 
-function save() {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(state));
-  } catch {
-    // Almacenamiento no disponible (modo privado, etc.): el estado vive solo en memoria.
-  }
+function save(id) {
+  getBackend()
+    .saveState(id, state[id], state)
+    .catch((err) => {
+      console.error(err);
+      toast('No se pudo guardar el cambio. Revisa tu conexión.');
+    });
 }
 
 export function getPostState(id) {
@@ -42,7 +40,7 @@ export function updatePost(id, patch) {
   const next = { ...state[id], ...patch, updatedAt: new Date().toISOString() };
   for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
   state = { ...state, [id]: next };
-  save();
+  save(id);
 }
 
 export function exportState() {
@@ -55,5 +53,5 @@ export function importState(json) {
     throw new Error('El archivo no es un respaldo de Posty.');
   }
   state = { ...state, ...parsed.posts };
-  save();
+  for (const id of Object.keys(parsed.posts)) save(id);
 }

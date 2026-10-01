@@ -1,10 +1,9 @@
 // "Kit de diseño" de Posty: el tema (colores, tipografías, firma, logo), las fuentes subidas,
 // el contenido por defecto de cada plantilla y las plantillas propias (fondo + capas de texto).
-// Se guarda en localStorage; los archivos (fuentes, imágenes) en IndexedDB (assets-db.js).
+// Se guarda en la cuenta (Supabase) o en el navegador en modo local; los archivos, con assets-db.js.
 
 import { assetUrl, putAsset, deleteAsset, newAssetId, getAsset, blobToDataUrl, dataUrlToBlob } from './assets-db.js';
-
-const KEY = 'posty:kit:v1';
+import { getBackend } from './backend.js';
 
 // Colores del design system que se pueden cambiar (variable CSS → etiqueta y valor original).
 export const THEME_COLORS = [
@@ -45,26 +44,23 @@ function defaultKit() {
   };
 }
 
-let kit = load();
+let kit = defaultKit();
 const listeners = new Set();
 
-function load() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    const base = defaultKit();
-    return parsed ? { ...base, ...parsed, theme: { ...base.theme, ...parsed.theme } } : base;
-  } catch {
-    return defaultKit();
-  }
+function merge(parsed) {
+  const base = defaultKit();
+  return parsed ? { ...base, ...parsed, theme: { ...base.theme, ...parsed.theme } } : base;
 }
 
+// Guardado agrupado: los selectores de color disparan muchos cambios seguidos.
+let saveTimer;
 function save() {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(kit));
-  } catch {
-    // Sin almacenamiento: el kit vive en esta pestaña.
-  }
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    getBackend()
+      .saveKit(kit)
+      .catch((err) => console.error('No se pudo guardar el kit', err));
+  }, 400);
   listeners.forEach((fn) => fn(kit));
 }
 
@@ -214,8 +210,9 @@ export function getCustomTemplate(id) {
   return kit.customTemplates.find((t) => t.id === id) || null;
 }
 
-// Carga en memoria los archivos del kit (fuentes, logo, fondos) y aplica el tema.
+// Carga el kit de la cuenta, sus archivos (fuentes, logo, fondos) y aplica el tema.
 export async function initKit() {
+  kit = merge(await getBackend().loadKit());
   await Promise.all(assetIds().map((id) => assetUrl(id)));
   await applyTheme();
 }
@@ -253,8 +250,7 @@ export async function importKit(json) {
   const data = JSON.parse(json);
   if (data?.app !== 'posty-kit' || !data.kit) throw new Error('El archivo no es un kit de diseño de Posty.');
   for (const [id, dataUrl] of Object.entries(data.assets || {})) await putAsset(id, await dataUrlToBlob(dataUrl));
-  const base = defaultKit();
-  kit = { ...base, ...data.kit, theme: { ...base.theme, ...data.kit.theme } };
+  kit = merge(data.kit);
   save();
   await applyTheme();
 }

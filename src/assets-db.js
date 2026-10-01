@@ -1,49 +1,28 @@
-// Archivos subidos por el usuario (fuentes, fondos de plantillas, logos) guardados en IndexedDB,
-// porque no caben en localStorage. Cada archivo se guarda como Blob con un id.
+// Archivos subidos por el usuario (fuentes, fondos de plantillas, logos). Se guardan en la cuenta
+// (Supabase Storage) o, en modo local, en IndexedDB del navegador (ver backend.js).
 
-const DB_NAME = 'posty-assets';
-const STORE = 'assets';
+import { getBackend } from './backend.js';
 
-let dbPromise;
-
-function open() {
-  dbPromise ??= new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-  return dbPromise;
-}
-
-async function tx(mode, fn) {
-  const db = await open();
-  return new Promise((resolve, reject) => {
-    const t = db.transaction(STORE, mode);
-    const result = fn(t.objectStore(STORE));
-    t.oncomplete = () => resolve(result?.result ?? result);
-    t.onerror = () => reject(t.error);
-  });
-}
+// URLs blob: en memoria para usar los archivos en CSS e <img>.
+const urls = new Map();
 
 export function newAssetId(prefix = 'asset') {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
 export function putAsset(id, blob) {
-  return tx('readwrite', (s) => s.put(blob, id));
+  return getBackend().putAsset(id, blob);
 }
 
 export function getAsset(id) {
-  return tx('readonly', (s) => s.get(id));
+  return getBackend().getAsset(id);
 }
 
 export function deleteAsset(id) {
-  return tx('readwrite', (s) => s.delete(id));
+  urls.delete(id);
+  return getBackend().deleteAsset(id);
 }
 
-// URLs blob: en memoria para usar los archivos en CSS e <img>.
-const urls = new Map();
 
 export async function assetUrl(id) {
   if (!id) return null;

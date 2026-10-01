@@ -9,6 +9,7 @@ import { $, esc, toast, copy, linkedinIcon } from './ui.js';
 import { postFromText, analyzeText, clip } from './autolayout.js';
 import { builtinPost, customPost, BUILTIN_TEMPLATES } from './templates.js';
 import { getKit, getCustomTemplate, setTemplateContent } from './kit.js';
+import { getBackend } from './backend.js';
 import {
   normalizePost,
   emptyVisual,
@@ -22,7 +23,6 @@ import {
   COVER_TONES,
 } from './visuals.js';
 
-const HISTORY_KEY = 'posty:created:v1';
 const CODE_KEY = 'posty:access-code';
 const MAX_HISTORY = 20;
 
@@ -86,22 +86,26 @@ function writeStorage(key, value) {
   }
 }
 
-let history = readStorage(HISTORY_KEY, []);
+// Posts creados: en la cuenta (Supabase) o en el navegador en modo local.
+let history = [];
 
-function persistHistory() {
-  if (!writeStorage(HISTORY_KEY, history)) {
-    toast('No hay espacio en el navegador: borra posts antiguos o usa imágenes más ligeras');
-  }
+export async function initCreateData() {
+  history = (await getBackend().listCreated()) || [];
+}
+
+function storageError(err) {
+  console.error(err);
+  toast(getBackend().mode === 'local' ? 'No hay espacio en el navegador: borra posts antiguos o usa imágenes más ligeras' : 'No se pudo guardar. Revisa tu conexión.');
 }
 
 function saveToHistory(post) {
   history = [post, ...history.filter((p) => p.id !== post.id)].slice(0, MAX_HISTORY);
-  persistHistory();
+  getBackend().saveCreated(post, history).catch(storageError);
 }
 
 function deleteFromHistory(id) {
   history = history.filter((p) => p.id !== id);
-  persistHistory();
+  getBackend().deleteCreated(id, history).catch(storageError);
 }
 
 // ---------- Utilidades ----------
@@ -578,9 +582,11 @@ async function generate() {
   state.editing = false;
   renderCreate();
   try {
+    const backend = getBackend();
+    const auth = backend.mode === 'cloud' ? { Authorization: `Bearer ${await backend.accessToken()}` } : { 'x-posty-code': readStorage(CODE_KEY, '') };
     const res = await fetch('/api/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-posty-code': readStorage(CODE_KEY, '') },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ prompt: state.prompt, format: state.format }),
     });
     const data = await res.json().catch(() => ({}));

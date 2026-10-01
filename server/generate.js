@@ -3,7 +3,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 
-export const FORMATS = ['carousel', 'card'];
+export const FORMATS = ['carousel', 'card', 'slide'];
 
 const SYSTEM_PROMPT = `Eres el ghostwriter de LinkedIn de Juan Daza (/jpdazab), UX/UI Manager y Product Designer en Barcelona.
 Escribes en español, en prosa concisa, directa y editorial. Nada de listas con viñetas dentro del texto del post y nunca uses rayas (em dashes). Cifras mejor que adjetivos, pero no inventes datos: si no tienes una cifra verificable en lo que te pide Juan, no pongas cifras.
@@ -24,6 +24,13 @@ const CARD_GUIDE = `Formato: post social 1080 x 1351 con el design system jpdaza
 - "lead": una frase de apoyo de máximo 60 caracteres.
 - "items": de 3 a 4 puntos, cada uno con "title" (máximo 28 caracteres, una línea) y "description" (máximo 80 caracteres).`;
 
+const SLIDE_GUIDE = `Formato: una sola imagen 1231 x 1731 con los componentes del carrusel del design system jpdazab (sin "Swipe").
+- "style": "slide" si hay una idea con cifras o un contraste que mostrar; "cover" si es una frase potente.
+- "cover" (si style es "cover"): "tone" (blue, ink, grey o yellow), "tag" (Blackbird, 1 o 2 palabras), "title" (Blackbird, máximo 45 caracteres), "underline" (una palabra del title o ""), "summary" (máximo 120 caracteres).
+- "slide" (si style es "slide"): "tag" (Blackbird), "title" y "titleAccent" (Blackbird, máximo 18 caracteres cada uno), "summary" (máximo 120 caracteres) y "visual" como en el carrusel ("none" salvo cifras reales; nunca "image").
+- Rellena también el bloque que no uses, con textos cortos coherentes.
+${BLACKBIRD_RULE}`;
+
 const base = {
   title: { type: 'string', description: 'Título interno corto para organizar el post' },
   text: { type: 'string', description: 'Texto del post listo para publicar, sin hashtags' },
@@ -33,27 +40,24 @@ const base = {
 const obj = (properties) => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 const str = { type: 'string' };
 
-const SCHEMAS = {
-  carousel: obj({
-    ...base,
-    cover: obj({ tone: { type: 'string', enum: ['blue', 'ink', 'grey', 'yellow'] }, tag: str, title: str, underline: str, summary: str }),
-    slides: {
-      type: 'array',
-      items: obj({
-        tag: str,
-        title: str,
-        titleAccent: str,
-        summary: str,
-        visual: obj({
-          kind: { type: 'string', enum: ['none', 'stats', 'bars', 'venn'] },
-          items: { type: 'array', items: obj({ label: str, value: { type: 'number' }, display: str }) },
-          left: str,
-          overlap: str,
-          right: str,
-        }),
-      }),
-    },
+const COVER = obj({ tone: { type: 'string', enum: ['blue', 'ink', 'grey', 'yellow'] }, tag: str, title: str, underline: str, summary: str });
+const SLIDE = obj({
+  tag: str,
+  title: str,
+  titleAccent: str,
+  summary: str,
+  visual: obj({
+    kind: { type: 'string', enum: ['none', 'stats', 'bars', 'venn'] },
+    items: { type: 'array', items: obj({ label: str, value: { type: 'number' }, display: str }) },
+    left: str,
+    overlap: str,
+    right: str,
   }),
+});
+
+const SCHEMAS = {
+  carousel: obj({ ...base, cover: COVER, slides: { type: 'array', items: SLIDE } }),
+  slide: obj({ ...base, style: { type: 'string', enum: ['slide', 'cover'] }, cover: COVER, slide: SLIDE }),
   card: obj({
     ...base,
     card: obj({
@@ -77,7 +81,7 @@ let client;
 export async function generatePost({ prompt, format }) {
   if (typeof prompt !== 'string' || !prompt.trim()) throw new GenerateError(400, 'Escribe de qué quieres que trate el post.');
   if (prompt.length > 8000) throw new GenerateError(400, 'La petición es demasiado larga (máximo 8.000 caracteres).');
-  if (!FORMATS.includes(format)) throw new GenerateError(400, 'Formato no válido: elige carrusel o card.');
+  if (!FORMATS.includes(format)) throw new GenerateError(400, 'Formato no válido: elige carrusel, card única o card.');
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new GenerateError(500, 'Falta configurar ANTHROPIC_API_KEY en el servidor.');
   }
@@ -95,7 +99,7 @@ export async function generatePost({ prompt, format }) {
         effort: 'medium',
         format: { type: 'json_schema', schema: SCHEMAS[format] },
       },
-      system: `${SYSTEM_PROMPT}\n\n${format === 'carousel' ? CAROUSEL_GUIDE : CARD_GUIDE}`,
+      system: `${SYSTEM_PROMPT}\n\n${{ carousel: CAROUSEL_GUIDE, card: CARD_GUIDE, slide: SLIDE_GUIDE }[format]}`,
       messages: [{ role: 'user', content: prompt.trim() }],
     });
   } catch (err) {

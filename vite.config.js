@@ -1,32 +1,21 @@
 import { defineConfig } from 'vite';
 
-// En desarrollo, sirve /api/generate con la misma lógica que la función de Vercel.
+// En desarrollo, /api/* usa la misma lógica que las funciones de Vercel (server/handlers.js).
 function devApi() {
   return {
     name: 'posty-dev-api',
     configureServer(server) {
-      server.middlewares.use('/api/generate', async (req, res) => {
-        const { generatePost, checkAccess, GenerateError } = await server.ssrLoadModule('/server/generate.js');
-        const send = (status, data) => {
-          res.statusCode = status;
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify(data));
-        };
-        if (req.method !== 'POST') return send(405, { error: 'Método no permitido' });
-        let raw = '';
-        for await (const chunk of req) raw += chunk;
-        try {
-          checkAccess(req.headers['x-posty-code']);
-          send(200, await generatePost(JSON.parse(raw || '{}')));
-        } catch (err) {
-          if (err instanceof GenerateError) return send(err.status, { error: err.message });
-          console.error(err);
-          send(500, { error: 'Error inesperado al generar el post.' });
-        }
-      });
+      const routes = { '/api/generate': ['handleGenerate', 64 * 1024], '/api/proposals': ['handleProposals', 5 * 1024 * 1024] };
+      for (const [path, [name, limit]] of Object.entries(routes)) {
+        server.middlewares.use(path, async (req, res) => {
+          const mod = await server.ssrLoadModule('/server/handlers.js');
+          req.url = path + (req.url === '/' ? '' : req.url);
+          return mod.nodeHandler(mod[name], limit)(req, res);
+        });
+      }
     },
   };
 }
 
-// Rutas relativas: el sitio funciona igual en Vercel, Netlify o GitHub Pages.
+// Rutas relativas: el sitio funciona igual en Vercel o en cualquier hosting estático.
 export default defineConfig({ base: './', plugins: [devApi()] });
