@@ -9,6 +9,7 @@ insert into public.weeks (week, source) values ('2026-W42', '---\nsemana: 2026-W
 insert into public.post_states (post_id, data) values ('2026-W42-1', '{"status":"publicado"}');
 insert into public.created_posts (id, data) values ('p1', '{"title":"A"}');
 insert into public.kits (data) values ('{"theme":{}}');
+insert into public.digest_settings (data) values ('{"topics":[{"name":"Liderazgo"}]}');
 insert into storage.objects (bucket_id, name) values ('assets', '00000000-0000-0000-0000-00000000000a/kit/logo');
 select public.create_ingest_token() as token \gset
 do $$ begin if (select count(*) from public.ingest_tokens) <> 1 then raise exception 'A debe ver su token'; end if; end $$;
@@ -41,14 +42,16 @@ end $$;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
 do $$ begin
   if (select count(*) from public.weeks) + (select count(*) from public.post_states) + (select count(*) from public.created_posts)
-     + (select count(*) from public.kits) + (select count(*) from public.ingest_tokens) + (select count(*) from storage.objects) <> 0
+     + (select count(*) from public.kits) + (select count(*) from public.digest_settings) + (select count(*) from public.ingest_tokens) + (select count(*) from storage.objects) <> 0
   then raise exception 'B ve datos de A'; end if;
   update public.weeks set source = 'hackeado';
   delete from public.created_posts;
+  update public.digest_settings set data = '{}';
 end $$;
 reset role;
 do $$ begin
-  if (select source from public.weeks) = 'hackeado' or (select count(*) from public.created_posts) <> 1 then raise exception 'B modificó datos de A'; end if;
+  if (select source from public.weeks) = 'hackeado' or (select count(*) from public.created_posts) <> 1
+     or (select data->'topics'->0->>'name' from public.digest_settings) <> 'Liderazgo' then raise exception 'B modificó datos de A'; end if;
 end $$;
 
 -- Límite mensual de IA (lo usa el servidor con service_role)

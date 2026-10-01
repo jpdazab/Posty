@@ -4,11 +4,13 @@
 // - POST /api/generate   { prompt, format }       Genera un post con Claude (sesión + límite mensual).
 // - POST /api/proposals?week=AAAA-Www            Markdown de la semana (rutina semanal, token personal).
 // - POST /api/proposals?week=AAAA-Www&file=x.png Un archivo de la semana (imagen o PDF).
+// - GET  /api/topics                             Temas del AI Digest de la persona (rutina semanal, token personal).
 
 import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { generatePost, checkAccess, GenerateError } from './generate.js';
 import { parseWeek } from '../src/parser.js';
+import { normalizeSettings, settingsBrief } from '../src/topics-format.js';
 
 export const MAX_MARKDOWN = 1024 * 1024; // 1 MB
 export const MAX_FILE = 4 * 1024 * 1024; // 4 MB (Vercel admite 4,5 MB por petición)
@@ -83,22 +85,46 @@ export async function handleGenerate(req, deps = {}) {
   }
 }
 
+// ---------- Rutinas: token personal ----------
+
+// Devuelve { userId } o { error: respuesta } según el token de la rutina.
+async function routineOwner(db, headers) {
+  if (!db) return { error: reply(503, { error: 'Posty no tiene Supabase configurado (faltan VITE_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY).' }) };
+  const token = bearer(headers);
+  if (!token) return { error: reply(401, { error: 'Falta el token de la rutina (cabecera Authorization: Bearer …).' }) };
+  const { data: owner, error } = await db.from('ingest_tokens').select('user_id').eq('token_hash', hashToken(token)).maybeSingle();
+  if (error) {
+    console.error(error);
+    return { error: reply(500, { error: 'No se pudo comprobar el token.' }) };
+  }
+  if (!owner) return { error: reply(401, { error: 'Token no válido. Crea uno nuevo en Posty → Cuenta.' }) };
+  return { userId: owner.user_id };
+}
+
+// ---------- /api/topics ----------
+
+export async function handleTopics(req, deps = {}) {
+  if (req.method !== 'GET') return reply(405, { error: 'Método no permitido' });
+  const db = deps.admin === undefined ? adminClient() : deps.admin;
+  const { userId, error } = await routineOwner(db, req.headers);
+  if (error) return error;
+  const { data, error: readError } = await db.from('digest_settings').select('data').eq('user_id', userId).maybeSingle();
+  if (readError) {
+    console.error(readError);
+    return reply(500, { error: 'No se pudieron leer los temas.' });
+  }
+  const settings = normalizeSettings(data?.data);
+  return reply(200, { ...settings, brief: settingsBrief(settings) });
+}
+
 // ---------- /api/proposals ----------
 
 export async function handleProposals(req, deps = {}) {
   if (req.method !== 'POST') return reply(405, { error: 'Método no permitido' });
   const db = deps.admin === undefined ? adminClient() : deps.admin;
-  if (!db) return reply(503, { error: 'Posty no tiene Supabase configurado (faltan VITE_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY).' });
-
-  const token = bearer(req.headers);
-  if (!token) return reply(401, { error: 'Falta el token de la rutina (cabecera Authorization: Bearer …).' });
-  const { data: owner, error: tokenError } = await db.from('ingest_tokens').select('user_id').eq('token_hash', hashToken(token)).maybeSingle();
-  if (tokenError) {
-    console.error(tokenError);
-    return reply(500, { error: 'No se pudo comprobar el token.' });
-  }
-  if (!owner) return reply(401, { error: 'Token no válido. Crea uno nuevo en Posty → Cuenta.' });
-  const userId = owner.user_id;
+  const owner = await routineOwner(db, req.headers);
+  if (owner.error) return owner.error;
+  const { userId } = owner;
 
   const week = String(req.query.week || '');
   if (!/^\d{4}-W\d{2}$/.test(week)) return reply(400, { error: 'Falta ?week= con el formato AAAA-Www (por ejemplo 2026-W42).' });

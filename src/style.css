@@ -581,3 +581,28 @@ body.wizard-open { overflow: hidden; }
   .wizard-foot .btn.primary { margin-left: auto; }
   .wizard-head, .wizard-foot { padding: 12px 16px; }
 }
+
+/* ---------- Temas del AI Digest ---------- */
+#topics:empty { display: none; }
+#topics { margin-bottom: 20px; }
+.topics-card { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.topics-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.topics-head h2 { font-size: 1.05rem; margin: 0 0 2px; }
+.topics-head p { margin: 0; }
+.topic-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.topic-chip { padding: 5px 12px; border-radius: 999px; background: var(--brand-soft); color: var(--brand); font-size: 0.85rem; font-weight: 600; }
+.topics-editor { border-color: var(--brand); }
+.topic-rows { display: flex; flex-direction: column; gap: 8px; }
+.topic-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; gap: 8px; align-items: center; }
+.topic-row input, .topic-add input { width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); color: var(--text); font: inherit; }
+.topic-row input:first-child { font-weight: 600; }
+.topic-add { display: flex; gap: 8px; }
+.topics-fields { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 12px; }
+.topics-editor .suggestions { margin: 0; }
+.topics-editor > p { margin: 0; }
+@media (max-width: 640px) {
+  .topic-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .topic-row input:nth-child(2) { grid-column: 1; grid-row: 2; }
+  .topics-fields { grid-template-columns: 1fr; }
+}
+.topic-row .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; font-size: 1.3rem; line-height: 1; }

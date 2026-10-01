@@ -46,6 +46,13 @@ create table if not exists public.kits (
   updated_at timestamptz not null default now()
 );
 
+-- Temas del AI Digest de cada usuario: los lee su rutina semanal (GET /api/topics) antes de preparar la semana.
+create table if not exists public.digest_settings (
+  user_id uuid primary key default auth.uid() references auth.users (id) on delete cascade,
+  data jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
 -- Posts generados con Claude por mes, para aplicar el límite mensual.
 create table if not exists public.ai_usage (
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -67,6 +74,7 @@ alter table public.weeks enable row level security;
 alter table public.post_states enable row level security;
 alter table public.created_posts enable row level security;
 alter table public.kits enable row level security;
+alter table public.digest_settings enable row level security;
 alter table public.ai_usage enable row level security;
 alter table public.ingest_tokens enable row level security;
 
@@ -84,6 +92,10 @@ create policy "posty: propias" on public.created_posts for all to authenticated
 
 drop policy if exists "posty: propias" on public.kits;
 create policy "posty: propias" on public.kits for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+drop policy if exists "posty: propias" on public.digest_settings;
+create policy "posty: propias" on public.digest_settings for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- El uso de IA y el token solo se leen; se escriben con las funciones de abajo.

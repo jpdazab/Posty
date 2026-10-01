@@ -13,7 +13,11 @@ function ingestUrl() {
 }
 
 function routineSnippet(token) {
-  return `Envía también la tanda a Posty, la plataforma donde reviso y publico los posts:
+  return `Antes de preparar la semana, lee mis temas en Posty y úsalos para elegir de qué tratan los posts (y su "pilar"):
+  curl -sS "${location.origin}/api/topics" -H "Authorization: Bearer ${token}"
+- La respuesta es JSON: "topics" (nombre y enfoque de cada tema), "postsPerWeek", "audience", "notes" y "brief" (las mismas indicaciones en texto). Sigue "brief".
+
+Envía también la tanda a Posty, la plataforma donde reviso y publico los posts:
 - Primero el Markdown de la semana (formato PROPUESTAS.md del repositorio jpdazab/Posty), en una sola petición:
   curl -sS -X POST "${ingestUrl()}?week=AAAA-Www" -H "Authorization: Bearer ${token}" -H "Content-Type: text/markdown; charset=utf-8" --data-binary @semana.md
 - Después cada imagen o PDF que nombra el Markdown, una petición por archivo (máximo 4 MB cada uno):

@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { handleGenerate, handleProposals, hashToken } from '../server/handlers.js';
+import { handleGenerate, handleProposals, handleTopics, hashToken } from '../server/handlers.js';
 import { GenerateError } from '../server/generate.js';
 
 // Supabase simulado: registra las llamadas y responde según `db`.
@@ -14,6 +14,7 @@ function fakeAdmin(db) {
       maybeSingle: async () => {
         calls.push(['select', name, q.filters]);
         if (name === 'ingest_tokens') return { data: db.tokens[q.filters.token_hash] ? { user_id: db.tokens[q.filters.token_hash] } : null, error: null };
+        if (name === 'digest_settings') return { data: db.settings?.[q.filters.user_id] ? { data: db.settings[q.filters.user_id] } : null, error: null };
         return { data: null, error: null };
       },
       upsert: async (row, opts) => (calls.push(['upsert', name, row, opts]), { error: db.failUpsert ? { message: 'x' } : null }),
@@ -140,4 +141,37 @@ test('proposals: sube archivos a la carpeta de la semana', async () => {
   assert.equal((await handleProposals(post('x', auth, { week: '2026-W42', file: 'script.js' }), { admin })).status, 400);
   const big = { ...post('', auth, { week: '2026-W42', file: 'big.png' }), body: Buffer.alloc(4 * 1024 * 1024 + 1) };
   assert.equal((await handleProposals(big, { admin })).status, 413);
+});
+
+// ---------- /api/topics ----------
+
+const get = (headers = {}) => ({ method: 'GET', headers, query: {}, body: Buffer.alloc(0) });
+
+test('topics: exige el token de la rutina', async () => {
+  const admin = fakeAdmin(db);
+  assert.equal((await handleTopics(get(), { admin })).status, 401);
+  assert.equal((await handleTopics(get({ authorization: 'Bearer otro' }), { admin })).status, 401);
+  assert.equal((await handleTopics({ ...get(), method: 'POST' }, { admin })).status, 405);
+});
+
+test('topics: devuelve los temas de la persona del token, limpios y con instrucciones', async () => {
+  db.settings = {
+    'user-a': { topics: [{ name: ' Liderazgo ', note: 'equipos remotos' }, { name: 'liderazgo' }, { name: '' }, { name: 'IA' }], postsPerWeek: 9, audience: 'Diseñadores' },
+    'user-b': { topics: [{ name: 'Ventas' }] },
+  };
+  const res = await handleTopics(get({ authorization: 'Bearer posty_tok' }), { admin: fakeAdmin(db) });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.json.topics, [{ name: 'Liderazgo', note: 'equipos remotos' }, { name: 'IA', note: '' }]);
+  assert.equal(res.json.postsPerWeek, 7);
+  assert.match(res.json.brief, /Prepara 7 posts/);
+  assert.match(res.json.brief, /- Liderazgo: equipos remotos\n- IA/);
+  assert.match(res.json.brief, /Audiencia: Diseñadores/);
+  assert.ok(!res.json.brief.includes('Ventas'));
+});
+
+test('topics: sin temas elegidos, la rutina sigue con los suyos', async () => {
+  const res = await handleTopics(get({ authorization: 'Bearer posty_tok' }), { admin: fakeAdmin(db) });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.json.topics, []);
+  assert.match(res.json.brief, /aún no eligió temas/);
 });

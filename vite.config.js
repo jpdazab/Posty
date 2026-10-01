@@ -5,7 +5,7 @@ function devApi() {
   return {
     name: 'posty-dev-api',
     configureServer(server) {
-      const routes = { '/api/generate': ['handleGenerate', 64 * 1024], '/api/proposals': ['handleProposals', 5 * 1024 * 1024] };
+      const routes = { '/api/generate': ['handleGenerate', 64 * 1024], '/api/proposals': ['handleProposals', 5 * 1024 * 1024], '/api/topics': ['handleTopics', 1024] };
       for (const [path, [name, limit]] of Object.entries(routes)) {
         server.middlewares.use(path, async (req, res) => {
           const mod = await server.ssrLoadModule('/server/handlers.js');

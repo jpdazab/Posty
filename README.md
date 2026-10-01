@@ -6,7 +6,9 @@ semanal (ver **[SETUP.md](./SETUP.md)** para configurarlo con Supabase y Vercel)
 
 Páginas del menú lateral:
 
-- **AI Digest**: las propuestas semanales (ver abajo).
+- **AI Digest**: las propuestas semanales (ver abajo). Arriba, **Tus temas**: cada cuenta elige sus temas
+  (con un enfoque opcional), cuántos posts quiere por semana, para quién escribe e indicaciones para
+  Claude. Su rutina semanal los lee con `GET /api/topics`.
 - **Crear post**, con tres modos:
   - **Pedir a Claude**: describes la idea y Claude escribe el post y la gráfica (necesita la API key).
   - **Pegar mi texto**: pegas un post ya escrito y Posty reparte el texto en la gráfica sin IA
@@ -89,6 +91,7 @@ Si el design system cambia, vuelve a copiar esos archivos desde el artifact.
     (si Claude falla, el intento no cuenta).
   - `POST /api/proposals?week=AAAA-Www[&file=…]`: recibe el Markdown y los archivos de la rutina semanal,
     autenticada con el token personal de cada usuario.
+  - `GET /api/topics`: los temas del digest de la persona del token, en JSON y como texto (`brief`).
 - **Supabase** (`supabase/schema.sql`): tablas con seguridad por usuario y Storage para archivos.
   `supabase/tests/` prueba que cada usuario solo accede a lo suyo.
 - `scripts/upload-week.mjs`: sube una semana desde una carpeta local con el token de una persona.

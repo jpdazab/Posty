@@ -5,6 +5,7 @@ import { initCreatePage, renderCreate, initCreateData } from './create.js';
 import { initDesignsPage, renderDesigns, afterWizard, prepareDesigns } from './designs.js';
 import { initKit, getKit } from './kit.js';
 import { showWizard } from './wizard.js';
+import { initTopics, initTopicsPanel, renderTopics } from './topics.js';
 import { initBackend, getBackend, mode as backendMode } from './backend.js';
 import { showLogin } from './auth.js';
 import { initAccountPage, renderAccount } from './account.js';
@@ -528,6 +529,7 @@ async function start() {
     // Fuentes, logo y fondos subidos se cargan antes de dibujar las gráficas.
     initKit(),
     backend.listWeeks().then(setWeeks),
+    initTopics(),
   ]);
   const failed = results.filter((r) => r.status === 'rejected');
   if (failed.length) {
@@ -537,6 +539,8 @@ async function start() {
   initCreatePage();
   initDesignsPage();
   initAccountPage();
+  initTopicsPanel();
+  renderTopics();
   render();
   window.addEventListener('hashchange', showRoute);
   showRoute();

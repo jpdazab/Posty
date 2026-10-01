@@ -89,6 +89,9 @@ Cada persona, dentro de Posty:
 2. Pega esas instrucciones en su rutina de Claude (la tarea programada que prepara sus posts),
    en lugar de cualquier paso que guarde las propuestas en el repositorio.
 
+Antes de preparar cada semana, la rutina lee los **temas** que la persona eligió en Posty
+(AI Digest → *Tus temas*) con `GET https://<tu-posty>/api/topics` y el mismo token.
+
 La rutina envía el Markdown de la semana (formato de [`PROPUESTAS.md`](./PROPUESTAS.md)) y sus imágenes a
 `https://<tu-posty>/api/proposals`. Si alguien crea un token nuevo, el anterior deja de funcionar
 y hay que actualizar su rutina.
@@ -107,11 +110,17 @@ POSTY_URL=https://<tu-posty> POSTY_TOKEN=posty_... node scripts/upload-week.mjs 
 
 ---
 
+## Actualizar Posty
+
+Cuando una versión nueva de Posty añade tablas (por ejemplo, los temas del digest), vuelve a ejecutar
+[`supabase/schema.sql`](./supabase/schema.sql) completo en **SQL Editor → Run**. Se puede ejecutar
+varias veces: no borra datos.
+
 ## Qué guarda cada sitio
 
 | Dónde | Qué |
 | --- | --- |
-| Supabase · tablas | Semanas (`weeks`), estado de cada propuesta (`post_states`), posts creados (`created_posts`), kit de diseño (`kits`), uso de Claude (`ai_usage`), tokens de rutina (`ingest_tokens`) |
+| Supabase · tablas | Semanas (`weeks`), temas del digest (`digest_settings`), estado de cada propuesta (`post_states`), posts creados (`created_posts`), kit de diseño (`kits`), uso de Claude (`ai_usage`), tokens de rutina (`ingest_tokens`) |
 | Supabase · Storage (`assets/<usuario>/…`) | Imágenes y PDF de las semanas, fuentes, logos y fondos de plantillas |
 | Vercel | La web y las funciones `/api/generate` y `/api/proposals` |
 

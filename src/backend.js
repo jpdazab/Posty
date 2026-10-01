@@ -13,7 +13,7 @@ export const mode = SUPABASE_URL && SUPABASE_ANON_KEY ? 'cloud' : 'local';
 
 // ---------- Local ----------
 
-const LOCAL_KEYS = { states: 'posty:state:v1', created: 'posty:created:v1', kit: 'posty:kit:v1' };
+const LOCAL_KEYS = { states: 'posty:state:v1', created: 'posty:created:v1', kit: 'posty:kit:v1', digest: 'posty:digest:v1' };
 
 function readLocal(key, fallback) {
   try {
@@ -73,6 +73,12 @@ function localBackend() {
     },
     async loadKit() {
       return readLocal(LOCAL_KEYS.kit, null);
+    },
+    async loadDigestSettings() {
+      return readLocal(LOCAL_KEYS.digest, null);
+    },
+    async saveDigestSettings(data) {
+      writeLocal(LOCAL_KEYS.digest, data);
     },
     async saveKit(data) {
       writeLocal(LOCAL_KEYS.kit, data);
@@ -155,6 +161,12 @@ export function cloudBackend(client, user) {
     async loadKit() {
       const row = check(await client.from('kits').select('data').maybeSingle());
       return row?.data && Object.keys(row.data).length ? row.data : null;
+    },
+    async loadDigestSettings() {
+      return check(await client.from('digest_settings').select('data').maybeSingle())?.data || null;
+    },
+    async saveDigestSettings(data) {
+      check(await client.from('digest_settings').upsert({ data, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }));
     },
     async saveKit(data) {
       check(await client.from('kits').upsert({ data, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }));

@@ -4,6 +4,9 @@ Cada semana la rutina de Claude de cada persona envía **un archivo Markdown** p
 por ejemplo `2026-W42`) y sus imágenes a `/api/proposals` con su token (ver `SETUP.md`, paso 6).
 También se puede subir a mano desde Posty → Cuenta.
 
+Los temas de cada semana salen de lo que la persona eligió en Posty (AI Digest → *Tus temas*): la rutina
+los lee con `GET /api/topics` y usa cada tema como `pilar`.
+
 ```markdown
 ---
 semana: 2026-W40
