@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseWeek, composePost, linkedInShareUrl } from '../src/parser.js';
+import { parseWeek, composePost, linkedInShareUrl, splitList } from '../src/parser.js';
 
 test('parsea frontmatter, metadatos y texto de cada post', () => {
   const week = parseWeek(`---
@@ -55,4 +55,12 @@ test('el archivo de ejemplo es válido', () => {
     assert.ok(post.text.length > 50);
     assert.match(post.dia, /^\d{4}-\d{2}-\d{2}$/);
   }
+});
+
+test('metadatos de imágenes, pdf y fuentes', () => {
+  const post = parseWeek('---\nsemana: 2026-W42\n---\n## P\nimagenes: a.jpg, b.jpg\npdf: c.pdf\nfuentes: https://a.com https://b.com\n\nTexto').posts[0];
+  assert.deepEqual(splitList(post.imagenes), ['a.jpg', 'b.jpg']);
+  assert.equal(post.pdf, 'c.pdf');
+  assert.deepEqual(splitList(post.fuentes, { spaces: true }), ['https://a.com', 'https://b.com']);
+  assert.equal(post.text, 'Texto');
 });

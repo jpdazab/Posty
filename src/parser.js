@@ -16,12 +16,15 @@
 //
 //   Texto del post tal cual se publicará en LinkedIn...
 
-export const META_KEYS = ['dia', 'hora', 'pilar', 'objetivo', 'formato', 'imagen', 'hashtags'];
+export const META_KEYS = [
+  'dia', 'hora', 'pilar', 'objetivo', 'formato', 'imagen', 'hashtags',
+  'imagenes', 'pdf', 'inspiracion', 'fuentes',
+];
 
 export const LINKEDIN_MAX_CHARS = 3000;
 
 function parseFrontmatter(source) {
-  const match = source.match(/^﻿?---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  const match = source.match(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
   if (!match) return { data: {}, body: source };
   const data = {};
   for (const line of match[1].split(/\r?\n/)) {
@@ -82,6 +85,12 @@ export function composePost(text, hashtags) {
     .map((t) => (t.startsWith('#') ? t : `#${t}`))
     .filter((t) => !text.toLowerCase().includes(t.toLowerCase()));
   return tags.length ? `${text}\n\n${tags.join(' ')}` : text;
+}
+
+// "a.png, b.png" -> ['a.png', 'b.png']; las fuentes (URLs) también pueden ir separadas por espacios.
+export function splitList(value, { spaces = false } = {}) {
+  if (!value) return [];
+  return value.split(spaces ? /[\s,]+/ : /\s*,\s*/).map((v) => v.trim()).filter(Boolean);
 }
 
 export function linkedInShareUrl(text) {

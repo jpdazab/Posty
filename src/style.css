@@ -221,6 +221,29 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); }
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+/* ---------- Media ---------- */
+.media { margin-top: 14px; }
+.gallery {
+  display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory;
+  padding-bottom: 6px; scrollbar-width: thin;
+}
+.gallery .slide {
+  position: relative; flex: 0 0 auto; width: min(260px, 70%); scroll-snap-align: start;
+  border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: var(--surface-2);
+}
+.gallery.single .slide { width: min(300px, 100%); }
+.gallery img { display: block; width: 100%; height: auto; }
+.slide-num {
+  position: absolute; top: 8px; right: 8px; padding: 2px 8px; border-radius: 99px;
+  background: rgb(0 0 0 / 0.6); color: #fff; font-size: 0.72rem; font-weight: 700;
+}
+.media-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.btn.small { padding: 5px 12px; font-size: 0.8rem; }
+.media-missing { margin: 6px 0 0; font-size: 0.8rem; color: var(--danger); }
+.sources { margin-top: 10px; font-size: 0.82rem; color: var(--muted); }
+.sources p { margin: 4px 0 0; }
+.sources a { color: var(--brand); }
+
 @media (max-width: 600px) {
   .stats { grid-template-columns: repeat(2, 1fr); }
   .brand p { display: none; }

@@ -1,14 +1,26 @@
-import { parseWeek, composePost, linkedInShareUrl, LINKEDIN_MAX_CHARS } from './parser.js';
+import { parseWeek, composePost, linkedInShareUrl, splitList, LINKEDIN_MAX_CHARS } from './parser.js';
 import { STATUSES, getPostState, getStatus, updatePost, exportState, importState } from './store.js';
 
 // Todas las propuestas de la carpeta /propuestas se incluyen al compilar.
 const files = import.meta.glob('../propuestas/*.md', { query: '?raw', import: 'default', eager: true });
 
+// Imágenes y PDFs de cada semana viven en propuestas/<archivo-sin-.md>/.
+const assets = import.meta.glob('../propuestas/**/*.{png,jpg,jpeg,webp,gif,pdf}', {
+  query: '?url',
+  import: 'default',
+  eager: true,
+});
+
 const weeks = Object.entries(files)
-  .map(([path, source]) => parseWeek(source, path.split('/').pop().replace(/\.md$/, '')))
+  .map(([path, source]) => {
+    const folder = path.split('/').pop().replace(/\.md$/, '');
+    return { ...parseWeek(source, folder), folder };
+  })
   .sort((a, b) => b.id.localeCompare(a.id));
 
-const allPosts = weeks.flatMap((w) => w.posts.map((p) => ({ ...p, week: w })));
+for (const w of weeks) w.posts = w.posts.map((p) => ({ ...p, week: w }));
+
+const allPosts = weeks.flatMap((w) => w.posts);
 const postsById = new Map(allPosts.map((p) => [p.id, p]));
 
 const PREVIEW_CHARS = 210; // Lo que LinkedIn muestra antes de "…ver más".
@@ -238,12 +250,74 @@ function renderPost(post) {
       ${meta ? `<div class="tags">${meta}</div>` : ''}
       ${body}
       ${editing ? '' : hashtags}
+      ${renderMedia(post)}
       ${post.imagen ? `<p class="image-hint">🖼️ ${esc(post.imagen)}</p>` : ''}
+      ${renderSources(post)}
       <div class="post-foot">
         <span class="count ${over ? 'over' : ''}" data-count="${esc(post.id)}">${full.length.toLocaleString('es')} / ${LINKEDIN_MAX_CHARS.toLocaleString('es')}</span>
         <div class="actions">${actions}</div>
       </div>
     </div>`;
+}
+
+function assetUrl(post, name) {
+  return assets[`../propuestas/${post.week.folder}/${name}`];
+}
+
+function postMedia(post) {
+  const images = splitList(post.imagenes).map((name) => ({ name, url: assetUrl(post, name) }));
+  const pdf = post.pdf ? { name: post.pdf, url: assetUrl(post, post.pdf) } : null;
+  return { images, pdf };
+}
+
+function renderMedia(post) {
+  const { images, pdf } = postMedia(post);
+  if (!images.length && !pdf) return '';
+  const missing = [...images, ...(pdf ? [pdf] : [])].filter((a) => !a.url).map((a) => a.name);
+  const found = images.filter((i) => i.url);
+  return `
+    <div class="media">
+      ${found.length ? `
+        <div class="gallery ${found.length === 1 ? 'single' : ''}">
+          ${found.map((img, i) => `
+            <a class="slide" href="${esc(img.url)}" target="_blank" rel="noopener" title="Abrir ${esc(img.name)}">
+              <img src="${esc(img.url)}" alt="Imagen ${i + 1} de ${found.length}: ${esc(post.title)}" loading="lazy" />
+              ${found.length > 1 ? `<span class="slide-num">${i + 1}/${found.length}</span>` : ''}
+            </a>`).join('')}
+        </div>` : ''}
+      <div class="media-actions">
+        ${found.length ? `<button class="btn ghost small" data-action="download-images" data-id="${esc(post.id)}">⬇ ${found.length === 1 ? 'Descargar imagen' : `Descargar ${found.length} imágenes`}</button>` : ''}
+        ${pdf?.url ? `<a class="btn ghost small" href="${esc(pdf.url)}" download="${esc(pdf.name)}">⬇ PDF del carrusel</a>` : ''}
+      </div>
+      ${missing.length ? `<p class="media-missing">No se encontró: ${missing.map(esc).join(', ')}</p>` : ''}
+    </div>`;
+}
+
+function renderSources(post) {
+  const urls = splitList(post.fuentes, { spaces: true }).filter((u) => /^https?:\/\//.test(u));
+  if (!post.inspiracion && !urls.length) return '';
+  const host = (u) => {
+    try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; }
+  };
+  return `
+    <div class="sources">
+      ${post.inspiracion ? `<p>💡 ${esc(post.inspiracion)}</p>` : ''}
+      ${urls.length ? `<p>Fuentes: ${urls.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(host(u))}</a>`).join(' · ')}</p>` : ''}
+    </div>`;
+}
+
+function downloadImages(post) {
+  postMedia(post).images.filter((i) => i.url).forEach((img, i) => {
+    // Pequeña pausa entre descargas para que el navegador no bloquee las siguientes.
+    setTimeout(() => {
+      const a = document.createElement('a');
+      a.href = img.url;
+      a.download = img.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }, i * 350);
+  });
 }
 
 function linkedinIcon() {
@@ -302,6 +376,10 @@ async function handleAction(btn) {
       openPublishDialog(id);
       break;
     }
+    case 'download-images':
+      downloadImages(post);
+      toast('Descargando imágenes…');
+      break;
     case 'copy':
       toast((await copy(finalText(post))) ? 'Texto copiado ✓' : 'No se pudo copiar');
       break;
