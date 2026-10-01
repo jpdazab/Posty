@@ -30,6 +30,8 @@ import {
 } from './kit.js';
 import { startFromTemplate, editTemplate } from './create.js';
 import { contentFromText, contentFromPage, designsFrom } from './layouts.js';
+
+const MAX_PDF_PAGES = 10;
 import { getBackend } from './backend.js';
 import { brandPreview, logoFields, colorFields, fontFields, brandInput, brandChange, brandClick, loadLogoColors, showWizard, syncBrandFields } from './wizard.js';
 
@@ -61,7 +63,7 @@ function templateCard({ key, name, description, badge, actions }) {
 function renderGenerator() {
   const g = ui.gen;
   if (!g) {
-    return `<div class="gen-cta"><div><strong>¿No sabes por dónde empezar?</strong><span class="muted small">Pega un texto o la dirección de un artículo y Posty te propone diseños con tu marca.</span></div>
+    return `<div class="gen-cta"><div><strong>¿No sabes por dónde empezar?</strong><span class="muted small">Pega un texto, la dirección de un artículo o sube un PDF y Posty te propone plantillas.</span></div>
       <button class="btn primary" data-design-action="gen-open">✳ Generar diseños</button></div>`;
   }
   const colors = g.page?.colors || [];
@@ -74,7 +76,29 @@ function renderGenerator() {
       <div class="mode-switch" role="tablist">
         <button role="tab" class="chip ${g.source === 'url' ? 'active' : ''}" aria-selected="${g.source === 'url'}" data-design-action="gen-source" data-source="url">Desde una URL</button>
         <button role="tab" class="chip ${g.source === 'text' ? 'active' : ''}" aria-selected="${g.source === 'text'}" data-design-action="gen-source" data-source="text">Desde un texto</button>
+        <button role="tab" class="chip ${g.source === 'pdf' ? 'active' : ''}" aria-selected="${g.source === 'pdf'}" data-design-action="gen-source" data-source="pdf">Desde un PDF</button>
       </div>
+      ${g.source === 'pdf' ? renderPdfSource(g) : renderTextUrlSource(g, colors)}
+      ${renderGenResults(g)}
+    </section>`;
+}
+
+function renderPdfSource(g) {
+  return `
+    <div class="gen-form">
+      <label class="pdf-drop ${g.loading ? 'busy' : ''}">
+        <input type="file" accept="application/pdf,.pdf" data-gen-pdf hidden ${g.loading ? 'disabled' : ''} />
+        <strong>${g.loading ? esc(g.progress || 'Leyendo el PDF…') : 'Elige un PDF'}</strong>
+        <span class="muted small">Cada página (hasta ${MAX_PDF_PAGES}) se convierte en una plantilla: el diseño queda de fondo y los textos pasan a ser capas editables, con su tamaño, color y posición.</span>
+      </label>
+      ${g.missingFonts?.length ? `<p class="warn-text small">El PDF usa ${g.missingFonts.map((f) => `<strong>${esc(f)}</strong>`).join(', ')}, que no ${g.missingFonts.length === 1 ? 'está' : 'están'} en Posty: se ha usado tu tipografía. Súbela en <a href="#/disenos" data-design-action="tab" data-tab="marca">Colores y tipografía</a> y vuelve a importar el PDF para que quede igual.</p>` : ''}
+      ${g.pdfInfo ? `<p class="muted small">${esc(g.pdfInfo)}</p>` : ''}
+      ${g.error ? `<p class="error-text">${esc(g.error)}</p>` : ''}
+    </div>`;
+}
+
+function renderTextUrlSource(g, colors) {
+  return `
       <form id="gen-form" class="gen-form" novalidate>
         ${
           g.source === 'url'
@@ -94,10 +118,16 @@ function renderGenerator() {
           <button class="btn primary" type="submit" ${g.loading ? 'disabled' : ''}>${g.loading ? 'Leyendo la web…' : 'Generar diseños'}</button>
         </div>
         ${g.error ? `<p class="error-text">${esc(g.error)}</p>` : ''}
-      </form>
+      </form>`;
+}
+
+function renderGenResults(g) {
+  if (!g.results?.length) return '';
+  const unsaved = g.results.filter((t) => !g.savedIds?.[t.id]).length;
+  return `
+      ${g.results.length > 1 && unsaved ? `<div class="actions start"><button class="btn ghost small" data-design-action="gen-save-all">Guardar las ${unsaved}</button></div>` : ''}
       ${
-        g.results?.length
-          ? `<div class="tpl-grid">${g.results
+        `<div class="tpl-grid">${g.results
               .map((t) =>
                 templateCard({
                   key: `custom:${t.id}`,
@@ -110,9 +140,7 @@ function renderGenerator() {
                 }),
               )
               .join('')}</div>`
-          : ''
-      }
-    </section>`;
+      }`;
 }
 
 function renderTemplates() {
@@ -131,7 +159,7 @@ function renderTemplateList(kit) {
       <div class="empty-state">
         <span class="empty-icon" aria-hidden="true">+</span>
         <h2>Crea tu primera plantilla</h2>
-        <p class="muted">Genera diseños desde un texto o una web, empieza con tus colores y tipografías, o sube como fondo un diseño exportado de Figma o Canva.</p>
+        <p class="muted">Genera diseños desde un texto, una web o un PDF, empieza con tus colores y tipografías, o sube como fondo un diseño exportado de Figma o Canva.</p>
         <div class="actions center">
           <button class="btn primary" data-design-action="gen-open">✳ Generar diseños</button>
           <button class="btn ghost" data-design-action="new-custom">Nueva plantilla</button>
@@ -212,7 +240,7 @@ function renderCustomEditor() {
           <fieldset class="ed-group">
             <legend>Plantilla</legend>
             <label class="ed-field"><span>Nombre</span><input type="text" data-tpl="name" value="${esc(t.name)}" /></label>
-            <label class="ed-field"><span>Tamaño</span><select data-tpl="size">${Object.entries(CUSTOM_SIZES)
+            <label class="ed-field"><span>Tamaño</span><select data-tpl="size">${t.size === 'custom' ? `<option value="custom" selected>${esc(customSize(t).label)}</option>` : ''}${Object.entries(CUSTOM_SIZES)
               .map(([k, v]) => `<option value="${k}" ${t.size === k ? 'selected' : ''}>${esc(v.label)}</option>`)
               .join('')}</select></label>
             <label class="ed-field"><span>Color de fondo</span><input type="color" data-tpl="background" value="${esc(t.background)}" /></label>
@@ -454,11 +482,51 @@ function authHeaders(backend) {
   return Promise.resolve({ 'x-posty-code': code });
 }
 
-// La imagen descargada de la web solo se conserva si alguna plantilla guardada la usa.
+// Las imágenes descargadas (web) o dibujadas (PDF) solo se conservan si alguna plantilla guardada las usa.
 function dropGenImage() {
-  const id = ui.gen?.imageAssetId;
-  if (id && !getKit().customTemplates.some((t) => t.bgAssetId === id)) deleteAsset(id).catch(() => {});
-  if (ui.gen) ui.gen.imageAssetId = null;
+  const g = ui.gen;
+  if (!g) return;
+  const ids = [g.imageAssetId, ...(g.pdfAssets || [])].filter(Boolean);
+  for (const id of ids) if (!getKit().customTemplates.some((t) => t.bgAssetId === id)) deleteAsset(id).catch(() => {});
+  g.imageAssetId = null;
+  g.pdfAssets = [];
+}
+
+async function importPdf(file) {
+  const g = ui.gen;
+  if (!/pdf$/i.test(file.type) && !/\.pdf$/i.test(file.name)) {
+    g.error = 'El archivo no es un PDF.';
+    renderDesigns();
+    return;
+  }
+  g.error = null;
+  g.loading = true;
+  g.progress = 'Cargando el lector de PDF…';
+  renderDesigns();
+  try {
+    const { templatesFromPdf } = await import('./pdf-import.js');
+    const result = await templatesFromPdf(file, {
+      onProgress: (n, total) => {
+        g.progress = `Convirtiendo la página ${n} de ${total}…`;
+        const strong = $('#designs-root .pdf-drop strong');
+        if (strong) strong.textContent = g.progress;
+      },
+    });
+    dropGenImage();
+    g.results = result.templates;
+    g.pdfAssets = result.templates.map((t) => t.bgAssetId);
+    g.savedIds = {};
+    g.missingFonts = result.missingFonts;
+    g.pdfInfo = result.totalPages > MAX_PDF_PAGES ? `El PDF tiene ${result.totalPages} páginas: se han convertido las ${MAX_PDF_PAGES} primeras.` : '';
+    g.pdfName = file.name;
+    setTempTemplates(g.results);
+    if (!g.results.some((t) => t.layers.length)) g.pdfInfo = `${g.pdfInfo} No se encontró texto editable (puede que el PDF sea una imagen): las plantillas tienen solo el fondo; añade capas de texto con Editar.`.trim();
+  } catch (err) {
+    console.error(err);
+    g.error = err.message || 'No se pudo leer el PDF.';
+  }
+  g.loading = false;
+  renderDesigns();
 }
 
 function buildDesigns() {
@@ -542,6 +610,7 @@ async function persistGenerated(genId) {
 function postTextFromSource() {
   const g = ui.gen;
   if (g.source === 'text') return g.text.trim();
+  if (g.source === 'pdf') return '';
   const p = g.page || {};
   return [p.title, p.description, p.url].filter(Boolean).join('\n\n');
 }
@@ -572,6 +641,11 @@ async function handle(btn) {
     case 'gen-source':
       ui.gen.source = btn.dataset.source;
       ui.gen.error = null;
+      renderDesigns();
+      break;
+    case 'gen-save-all':
+      for (const t of ui.gen.results) await persistGenerated(t.id);
+      toast('Plantillas guardadas en Mis plantillas');
       renderDesigns();
       break;
     case 'gen-save':
@@ -724,6 +798,10 @@ async function handleChange(e) {
   const el = e.target;
   if (await brandChange(el, rerenderBrand)) return;
   try {
+    if (el.dataset.genPdf !== undefined && el.files[0] && ui.gen) {
+      await importPdf(el.files[0]);
+      return;
+    }
     if (el.dataset.genField && ui.gen) {
       const key = el.dataset.genField;
       ui.gen[key] = el.type === 'checkbox' ? el.checked : el.value;

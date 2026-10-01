@@ -132,5 +132,7 @@ export function customPost(id) {
 }
 
 export function customSize(tpl) {
+  // Plantillas hechas desde un PDF: conservan las proporciones de la página.
+  if (tpl?.size === 'custom' && tpl.width && tpl.height) return { w: tpl.width, h: tpl.height, label: `Del PDF · ${tpl.width} × ${tpl.height}` };
   return CUSTOM_SIZES[tpl?.size] || CUSTOM_SIZES['1080x1350'];
 }

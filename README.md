@@ -34,6 +34,10 @@ Páginas del menú lateral:
     composiciones (editorial, bloque de color, cita, lista, dato e imagen) con tus colores y tipografías,
     ajustando el tamaño del texto para que quepa. De una web toma el título, la descripción, los puntos,
     sus colores (opcional) y su imagen principal. Cada propuesta se guarda, se edita o se usa en un post.
+    **Desde un PDF** (por ejemplo, un diseño exportado de Figma, Canva o PowerPoint): cada página, hasta 10,
+    se convierte en una plantilla con la página de fondo sin sus textos y los textos como capas editables
+    (posición, tamaño, color, alineación, peso y tipografía si la tienes subida). Se hace en el navegador con
+    pdf.js; el texto girado y los PDF escaneados se quedan en el fondo.
   - **Mis plantillas**: plantillas propias con fondo (color o imagen, por ejemplo exportada de Figma)
     y capas de texto con posición, tamaño, color, tipografía, peso y alineación.
   - **Colores y tipografía**: los colores, tipografías, firma y logo de la marca (los mismos controles

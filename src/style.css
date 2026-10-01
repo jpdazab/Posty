@@ -630,3 +630,8 @@ body.wizard-open { overflow: hidden; }
 .swatch-mini i { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgb(0 0 0 / 0.1); }
 .actions.center { justify-content: center; }
 .gen-designs .tpl-grid { margin-top: 4px; }
+.pdf-drop { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 28px 16px; border: 2px dashed var(--border); border-radius: var(--radius); background: var(--surface-2); text-align: center; cursor: pointer; }
+.pdf-drop:hover { border-color: var(--brand); background: var(--brand-soft); }
+.pdf-drop strong { font-size: 1.05rem; }
+.pdf-drop span { max-width: 520px; }
+.pdf-drop.busy { cursor: progress; border-style: solid; }
