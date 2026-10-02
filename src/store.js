@@ -52,16 +52,3 @@ export function resetWeekStates(weekId) {
     }
   }
 }
-
-export function exportState() {
-  return JSON.stringify({ app: 'posty', version: 1, exportedAt: new Date().toISOString(), posts: state }, null, 2);
-}
-
-export function importState(json) {
-  const parsed = JSON.parse(json);
-  if (!parsed || parsed.app !== 'posty' || typeof parsed.posts !== 'object') {
-    throw new Error('El archivo no es un respaldo de Posty.');
-  }
-  state = { ...state, ...parsed.posts };
-  for (const id of Object.keys(parsed.posts)) save(id);
-}

@@ -1,5 +1,5 @@
 import { parseWeek, composePost, linkedInShareUrl, splitList, LINKEDIN_MAX_CHARS } from './parser.js';
-import { STATUSES, getPostState, getStatus, updatePost, exportState, importState, initStore } from './store.js';
+import { STATUSES, getPostState, getStatus, updatePost, initStore } from './store.js';
 import { $, esc, toast, copy, linkedinIcon } from './ui.js';
 import { initCreatePage, startFromDigest, renderCreate, initCreateData, refreshCreated } from './create.js';
 import { initDesignsPage, renderDesigns, afterWizard, prepareDesigns } from './designs.js';
@@ -465,28 +465,6 @@ $('#publish-dialog').addEventListener('close', () => {
   updatePost(id, { status: 'publicado', publishedAt: new Date().toISOString(), url: url || undefined });
   toast('¡Publicado! 🎉');
   render();
-});
-
-$('#export-btn').addEventListener('click', () => {
-  const blob = new Blob([exportState()], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `posty-respaldo-${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-});
-
-$('#import-input').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  try {
-    importState(await file.text());
-    toast('Respaldo importado ✓');
-    render();
-  } catch (err) {
-    toast(err.message || 'No se pudo importar');
-  }
-  e.target.value = '';
 });
 
 // ---------- Navegación ----------

@@ -81,8 +81,7 @@ Páginas del menú lateral:
 4. Arriba ves los totales y el **próximo post a publicar**; los posts con fecha vencida
    aparecen como **Atrasado**.
 
-El estado (aprobado, publicado, ediciones) se guarda en tu navegador. Usa **Exportar** /
-**Importar** para respaldarlo o pasarlo a otro dispositivo.
+El estado (aprobado, publicado, ediciones) se guarda en tu cuenta y se sincroniza entre dispositivos.
 
 ## Desarrollo
 
