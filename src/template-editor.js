@@ -435,7 +435,7 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
   function addBlock(type, at) {
     if (type === 'logo') {
       if (!getKit().theme.logoAssetId) {
-        toast('Sube primero tu logo en Diseños → Colores y tipografía');
+        toast('Sube primero tu logo en Templates → Colores y tipografía');
         return;
       }
       change(() => {

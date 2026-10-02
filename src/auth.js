@@ -182,7 +182,7 @@ export function showLogin() {
       <ul class="login-points">
         <li><strong>AI Digest</strong><span>Las propuestas de tu rutina semanal, para revisar y publicar.</span></li>
         <li><strong>Crear post</strong><span>Pide a Claude, pega tu texto o empieza desde cero.</span></li>
-        <li><strong>Diseños</strong><span>Carruseles y cards con tu marca, en PNG y PDF.</span></li>
+        <li><strong>Templates</strong><span>Carruseles y cards con tu marca, en PNG y PDF.</span></li>
       </ul>
     </section>
     <section class="login-panel" aria-live="polite"></section>`;

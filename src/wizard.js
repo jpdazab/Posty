@@ -326,7 +326,7 @@ function stepBody() {
     case 'marca':
       return `
         <h2>Empecemos por tu marca</h2>
-        <p class="muted">Posty empieza en blanco: tus plantillas usarán tu logo, tus colores y tus tipografías. Puedes cambiar todo después en Diseños.</p>
+        <p class="muted">Posty empieza en blanco: tus plantillas usarán tu logo, tus colores y tus tipografías. Puedes cambiar todo después en Templates.</p>
         ${logoFields()}`;
     case 'colores':
       return `

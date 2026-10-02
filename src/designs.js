@@ -376,7 +376,7 @@ export function renderDesigns() {
   root.innerHTML = `
     <header class="page-head page-head-row">
       <div>
-        <h1>Diseños</h1>
+        <h1>Templates</h1>
         <p class="muted">Tus plantillas y tu marca: colores, tipografías, firma y logo.</p>
       </div>
       <div class="actions">

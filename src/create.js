@@ -13,6 +13,7 @@ import { textLayers, postLayers, isText } from './layer-style.js';
 import { CHART_TYPES } from './charts.js';
 import { generateAiImage, hasOpenAiKey, suggestPrompt } from './ai-image.js';
 import { getBackend } from './backend.js';
+import { closeCreate } from './main.js';
 import {
   normalizePost,
   emptyVisual,
@@ -266,7 +267,7 @@ function renderFormatQuestion() {
   if (!kit.builtins && !kit.customTemplates.length) {
     return bubble(
       'assistant',
-      `<p>Aún no tienes plantillas. Crea la primera en Diseños con tus colores y tipografías y vuelve aquí para usarla.</p>
+      `<p>Aún no tienes plantillas. Crea la primera en Templates con tus colores y tipografías y vuelve aquí para usarla.</p>
        <div class="actions start"><button class="btn primary" data-create-action="go-designs">Crear una plantilla</button></div>`,
     );
   }
@@ -397,7 +398,7 @@ function aiImageControls(target, ratio) {
 function renderGraphicEditor(post) {
   if (post.format === 'custom') {
     const tpl = getCustomTemplate(post.templateId);
-    if (!tpl) return '<p class="error-text">La plantilla de este post se borró en Diseños.</p>';
+    if (!tpl) return '<p class="error-text">La plantilla de este post se borró en Templates.</p>';
     return `
       <fieldset class="ed-group">
         <legend>${esc(tpl.name)}</legend>
@@ -688,7 +689,8 @@ export function renderCreate() {
   unmountPages(root);
   const full = state.fullscreen && state.result;
   root.innerHTML = `
-    <header class="page-head">
+    <header class="page-head create-head">
+      <button class="btn ghost small create-close" data-create-action="close-page" aria-label="Cerrar Crear post">✕ Cerrar</button>
       <h1>Crear post</h1>
       <p class="muted">Pide un post a Claude, pega tu texto o empieza desde cero. La gráfica sale con tus plantillas, lista para LinkedIn.</p>
     </header>
@@ -857,6 +859,9 @@ async function handle(btn) {
     }
     case 'new':
       resetToStart();
+      break;
+    case 'close-page':
+      closeCreate();
       break;
     case 'open': {
       const found = history.find((p) => p.id === btn.dataset.id);
@@ -1087,10 +1092,12 @@ export function initCreatePage() {
     fitVisuals(root);
     if (state.fullscreen) fitFullscreenFrames();
   });
-  // Esc cierra el post a pantalla completa (si no se está editando ni escribiendo).
+  // Esc cierra el post a pantalla completa o Crear post (si no se está editando ni escribiendo).
   document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || !state.fullscreen || state.editing || root.hidden) return;
-    if (e.target.closest?.('input, textarea, select')) return;
-    resetToStart();
+    if (e.key !== 'Escape' || root.hidden || state.editing || e.defaultPrevented) return;
+    if (e.target.closest?.('input, textarea, select') || document.querySelector('.modal-backdrop')) return;
+    // Primero se cierra el post abierto; con la pantalla de inicio a la vista, se cierra Crear post.
+    if (state.fullscreen) resetToStart();
+    else if (state.step === 'prompt') closeCreate();
   });
 }

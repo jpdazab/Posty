@@ -470,11 +470,17 @@ $('#publish-dialog').addEventListener('close', () => {
 // ---------- Navegación ----------
 
 const ROUTES = ['digest', 'crear', 'disenos', 'cuenta'];
-const TITLES = { crear: 'Crear post', disenos: 'Diseños', digest: 'AI Digest', cuenta: 'Cuenta' };
+const TITLES = { crear: 'Crear post', disenos: 'Templates', digest: 'AI Digest', cuenta: 'Cuenta' };
 
 function route() {
   const name = location.hash.replace(/^#\/?/, '');
   return ROUTES.includes(name) ? name : 'digest';
+}
+
+let lastRoute = 'digest';
+
+export function closeCreate() {
+  location.hash = `#/${lastRoute}`;
 }
 
 function showRoute() {
@@ -487,6 +493,9 @@ function showRoute() {
     else link.removeAttribute('aria-current');
   }
   document.title = `${TITLES[current]} · Posty`;
+  // Crear post se abre a pantalla completa, encima del resto; al cerrarlo se vuelve a la página anterior.
+  document.body.classList.toggle('creating', current === 'crear');
+  if (current !== 'crear') lastRoute = current;
   if (current === 'crear') renderCreate();
   if (current === 'disenos') renderDesigns();
   if (current === 'cuenta') renderAccount();
