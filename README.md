@@ -45,6 +45,11 @@ Páginas del menú lateral:
     arrastre (arriba = delante), propiedades del elemento o del lienzo (fondo de color o imagen, capa de
     color, logo), deshacer/rehacer y atajos (Supr, flechas, ⌘/Ctrl+D). Al crear un post, el primer texto
     recibe el titular y el segundo el texto.
+    **Gráficas** (columnas, barras horizontales, línea, donut y cifras) con los colores de la marca:
+    datos "valor | etiqueta", editables en la plantilla y en cada post. Los colores del donut se ajustan
+    para que porciones vecinas se distingan también con daltonismo, y siempre lleva leyenda.
+    Las **imágenes** de la plantilla se pueden dejar como hueco y elegir en cada post (el hueco vacío no
+    sale en el PNG).
   - **Colores y tipografía**: los colores, tipografías, firma y logo de la marca (los mismos controles
     del asistente). Las plantillas nuevas empiezan con ellos.
   - **Exportar / importar kit**: un JSON con todo lo anterior (incluidos los archivos) para llevarlo

@@ -8,6 +8,7 @@ import { React, Jpdazab as J, lockupUrl } from './ds/index.js';
 import { getKit, getCustomTemplate } from './kit.js';
 import { cachedAssetUrl } from './assets-db.js';
 import { layerStyle } from './layer-style.js';
+import { chartSvg } from './charts.js';
 import { customSize } from './templates.js';
 
 const h = React.createElement;
@@ -56,6 +57,8 @@ export function normalizePost(post) {
     };
   } else if (p.format === 'custom') {
     p.fields = { ...(p.fields || {}) };
+    p.images = { ...(p.images || {}) };
+    p.charts = { ...(p.charts || {}) };
   } else if (p.format === 'slide') {
     p.style = p.style === 'cover' ? 'cover' : 'slide';
     p.cover = { tone: 'blue', tag: '', title: '', underline: '', summary: '', ...(p.cover || {}) };
@@ -178,9 +181,15 @@ function CustomTemplate({ post }) {
     logo && h('img', { key: '__logo', className: 'ds-layer ds-logo', src: logo, alt: 'Logo', style: { left: tpl.logo.x, top: tpl.logo.y, height: tpl.logo.h } }),
     tpl.layers.map((l) => {
       if (l.kind === 'shape') return h('div', { key: l.id, className: 'ds-layer', style: layerStyle(l) });
+      if (l.kind === 'chart') {
+        return h('div', { key: l.id, className: 'ds-layer ds-chart', style: layerStyle(l), dangerouslySetInnerHTML: { __html: chartSvg(l, post.charts?.[l.id]) } });
+      }
       if (l.kind === 'image') {
-        const src = cachedAssetUrl(l.assetId);
-        return src ? h('img', { key: l.id, className: 'ds-layer', src, alt: l.alt || '', style: layerStyle(l) }) : null;
+        // La imagen elegida en el post manda; si no, la de la plantilla; si no hay ninguna, un hueco que no se exporta.
+        const src = post.images?.[l.id] || cachedAssetUrl(l.assetId);
+        return src
+          ? h('img', { key: l.id, className: 'ds-layer', src, alt: l.alt || '', style: layerStyle(l) })
+          : h('div', { key: l.id, className: 'ds-layer ds-img-empty', style: { ...layerStyle(l), display: 'grid' } }, 'Elige una imagen');
       }
       return h('div', { key: l.id, className: 'ds-layer', style: layerStyle(l) }, post.fields?.[l.id] ?? l.sample ?? '');
     }),
@@ -254,7 +263,8 @@ async function renderPng(node) {
   }
   const w = node.offsetWidth;
   const height = node.offsetHeight;
-  return toPng(node, { width: w, height, pixelRatio: 1, cacheBust: false, style: { transform: 'none' } });
+  // Los huecos de imagen sin rellenar no salen en el PNG.
+  return toPng(node, { width: w, height, pixelRatio: 1, cacheBust: false, style: { transform: 'none' }, filter: (n) => !n.classList?.contains('ds-img-empty') });
 }
 
 function download(href, name) {

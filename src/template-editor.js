@@ -12,6 +12,7 @@ import { getKit, allFontFamilies, storeImage, CUSTOM_SIZES } from './kit.js';
 import { customSize } from './templates.js';
 import { layerCss, isText } from './layer-style.js';
 import { contrast } from './layouts.js';
+import { chartSvg, CHART_TYPES, SAMPLE_DATA, categoricalPalette, mix } from './charts.js';
 
 const LOGO = '__logo';
 const WEIGHTS = [300, 400, 500, 600, 700, 800, 900];
@@ -31,11 +32,17 @@ const ICONS = {
   circulo: '●',
   imagen: '🖼',
   logo: '◎',
+  'g-bar': '▮▮',
+  'g-hbar': '☰',
+  'g-line': '⟋',
+  'g-donut': '◐',
+  'g-stats': '12',
 };
 
 const BLOCKS = [
   { group: 'Texto', items: [['titulo', 'Título'], ['subtitulo', 'Subtítulo'], ['parrafo', 'Párrafo'], ['lista', 'Lista'], ['cita', 'Cita'], ['etiqueta', 'Etiqueta'], ['cifra', 'Cifra'], ['firma', 'Firma']] },
   { group: 'Elementos', items: [['boton', 'Botón'], ['separador', 'Separador'], ['bloque', 'Bloque de color'], ['circulo', 'Círculo'], ['imagen', 'Imagen'], ['logo', 'Logo']] },
+  { group: 'Gráficas', items: [['g-bar', 'Columnas'], ['g-hbar', 'Barras'], ['g-line', 'Línea'], ['g-donut', 'Donut'], ['g-stats', 'Cifras']] },
 ];
 const BLOCK_LABEL = Object.fromEntries(BLOCKS.flatMap((g) => g.items));
 
@@ -71,6 +78,31 @@ function blockLayer(type, tpl) {
     circulo: () => shape({ w: round(320 * k), h: round(320 * k), color: c.secondary, radius: 9999 }),
     imagen: () => ({ kind: 'image', x: m, y: 0, w: round(600 * k), h: round(400 * k), radius: round(16 * k), assetId: null }),
   };
+  if (type.startsWith('g-')) {
+    // Gráfica: color principal para las marcas, color de texto para etiquetas y valores.
+    const chart = type.slice(2);
+    const surface = tpl.background || c.background;
+    const color = contrast(c.primary, surface) >= 2 ? c.primary : ink;
+    return {
+      id: uid('grafica'),
+      name: `Gráfica: ${CHART_TYPES[chart].toLowerCase()}`,
+      kind: 'chart',
+      chart,
+      x: m,
+      y: 0,
+      w: W - 2 * m,
+      h: round((chart === 'stats' ? 220 : chart === 'hbar' ? 420 : 480) * k),
+      data: SAMPLE_DATA[chart],
+      color,
+      track: mix(color, surface, 0.82),
+      text: ink,
+      surface,
+      palette: categoricalPalette(c.primary, c.secondary, surface),
+      font: f.body,
+      headingFont: f.heading,
+      labelSize: round(28 * k),
+    };
+  }
   return { id: uid(type), name: BLOCK_LABEL[type], ...make[type]() };
 }
 
@@ -161,11 +193,12 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
   function elementHtml(l) {
     const sel = ed.sel === l.id ? ' is-selected' : '';
     if (l.kind === 'shape') return `<div class="te-el${sel}" data-id="${l.id}" style="${esc(layerCss(l))}"></div>`;
+    if (l.kind === 'chart') return `<div class="te-el te-chart${sel}" data-id="${l.id}" style="${esc(layerCss(l))}">${chartSvg(l)}</div>`;
     if (l.kind === 'image') {
       const src = cachedAssetUrl(l.assetId);
       return src
         ? `<img class="te-el${sel}" data-id="${l.id}" src="${esc(src)}" alt="" draggable="false" style="${esc(layerCss(l))}" />`
-        : `<div class="te-el te-ph${sel}" data-id="${l.id}" style="${esc(layerCss(l))}"><span>Imagen<br><small>Súbela en propiedades</small></span></div>`;
+        : `<div class="te-el te-ph${sel}" data-id="${l.id}" style="${esc(`${layerCss(l)};display:grid`)}"><span>Imagen<br><small>Súbela aquí o elígela al crear el post</small></span></div>`;
     }
     return `<div class="te-el te-text${sel}" data-id="${l.id}" style="${esc(layerCss(l))}">${esc(l.sample ?? '')}</div>`;
   }
@@ -212,7 +245,7 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
     const list = q('.te-layers');
     const texts = ed.tpl.layers.filter(isText);
     const roles = { [texts[0]?.id]: 'Titular', [texts[1]?.id]: 'Texto' };
-    const icon = (l) => (l.kind === 'shape' ? (l.radius >= 999 ? ICONS.circulo : ICONS.bloque) : l.kind === 'image' ? ICONS.imagen : l.bg ? ICONS.boton : 'T');
+    const icon = (l) => (l.kind === 'chart' ? ICONS[`g-${l.chart}`] : l.kind === 'shape' ? (l.radius >= 999 ? ICONS.circulo : ICONS.bloque) : l.kind === 'image' ? ICONS.imagen : l.bg ? ICONS.boton : 'T');
     const rows = [...ed.tpl.layers]
       .reverse()
       .map(
@@ -302,6 +335,19 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
       ${field('Opacidad', `<input type="range" min="0.05" max="1" step="0.05" data-te-prop="opacity" value="${esc(l.opacity ?? 1)}" />`)}`;
   }
 
+  function chartProps(l) {
+    return `
+      ${field('Nombre', `<input type="text" data-te-prop="name" value="${esc(l.name || '')}" maxlength="40" />`)}
+      ${field('Tipo', `<select data-te-prop="chart">${Object.entries(CHART_TYPES).map(([k, v]) => `<option value="${k}" ${l.chart === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>`)}
+      ${field('Datos de ejemplo', `<textarea data-te-prop="data" rows="5">${esc(l.data || '')}</textarea>`)}
+      <small class="muted">Una línea por dato: valor | etiqueta (por ejemplo, "48% | Research"). En cada post se pueden cambiar.</small>
+      <div class="ed-row">${color('Color', 'color', l.color)}${color('Texto', 'text', l.text)}${num('Tamaño texto', 'labelSize', l.labelSize, { min: 10, max: 120 })}</div>
+      ${l.chart === 'hbar' ? `<div class="ed-row">${color('Pista', 'track', l.track)}</div>` : ''}
+      ${l.chart === 'donut' ? `<div class="ed-row">${(l.palette || []).map((c, i) => color(`Color ${i + 1}`, `palette.${i}`, c)).join('')}</div>` : ''}
+      ${position(l, true)}
+      ${field('Opacidad', `<input type="range" min="0.1" max="1" step="0.05" data-te-prop="opacity" value="${esc(l.opacity ?? 1)}" />`)}`;
+  }
+
   function imageProps(l) {
     return `
       ${field('Nombre', `<input type="text" data-te-prop="name" value="${esc(l.name || '')}" maxlength="40" />`)}
@@ -326,9 +372,9 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
       panel.innerHTML = canvasProps();
       return;
     }
-    const title = l.kind === 'shape' ? 'Forma' : l.kind === 'image' ? 'Imagen' : 'Texto';
+    const title = l.kind === 'chart' ? 'Gráfica' : l.kind === 'shape' ? 'Forma' : l.kind === 'image' ? 'Imagen' : 'Texto';
     panel.innerHTML = `<div class="te-props-head"><h3>${title}</h3><button class="link" data-te="deselect">Lienzo</button></div>
-      ${l.kind === 'shape' ? shapeProps(l) : l.kind === 'image' ? imageProps(l) : textProps(l)}
+      ${l.kind === 'chart' ? chartProps(l) : l.kind === 'shape' ? shapeProps(l) : l.kind === 'image' ? imageProps(l) : textProps(l)}
       ${layerActions()}`;
   }
 
@@ -366,6 +412,7 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
     } else {
       const l = layerById(id);
       el.setAttribute('style', layerCss(l));
+      if (l.kind === 'chart') el.innerHTML = chartSvg(l);
       if (isText(l) && ed.editing !== id && el.textContent !== (l.sample ?? '')) el.textContent = l.sample ?? '';
     }
     placeSelection();
@@ -639,10 +686,21 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
         let v = valueOf(el);
         if (path === 'weight') v = Number(v);
         if (path === 'bg' && el.type === 'checkbox') v = v ? getKit().brand.colors.primary : null;
-        l[path] = v;
+        if (path.startsWith('palette.')) {
+          l.palette = [...(l.palette || [])];
+          l.palette[Number(path.split('.')[1])] = v;
+        } else l[path] = v;
       }
       refreshElement(ed.sel);
       if (path === 'name' || path === 'sample') renderLayers();
+      // Al cambiar el tipo de gráfica se proponen sus datos de ejemplo si no se habían tocado.
+      if (path === 'chart') {
+        const l = layerById(ed.sel);
+        if (Object.values(SAMPLE_DATA).includes(l.data)) l.data = SAMPLE_DATA[l.chart];
+        l.name = `Gráfica: ${CHART_TYPES[l.chart].toLowerCase()}`;
+        refreshElement(l.id);
+        renderLayers();
+      }
       // Las casillas y desplegables cambian qué campos se ven.
       if (el.type === 'checkbox' || el.tagName === 'SELECT') {
         commit();

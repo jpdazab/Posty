@@ -5,12 +5,18 @@
 // - 'text' (o sin kind, plantillas anteriores): texto con fuente, tamaño, color, alineación…
 //   y opcionalmente fondo, relleno y esquinas redondeadas (botones, etiquetas).
 // - 'shape': rectángulo o círculo de color (separadores, bloques de fondo).
-// - 'image': imagen subida, recortada para llenar su caja.
+// - 'image': imagen subida, recortada para llenar su caja (o elegida al crear el post).
+// - 'chart': gráfica SVG (ver charts.js); los datos se pueden cambiar en cada post.
 
 export const isText = (l) => !l.kind || l.kind === 'text';
 
 export function textLayers(tpl) {
   return (tpl?.layers || []).filter(isText);
+}
+
+// Capas que se rellenan en cada post: textos, imágenes y gráficas.
+export function postLayers(tpl) {
+  return (tpl?.layers || []).filter((l) => isText(l) || l.kind === 'image' || l.kind === 'chart');
 }
 
 // Estilo en camelCase (React y element.style).
@@ -19,6 +25,7 @@ export function layerStyle(l) {
   if (l.kind === 'shape') {
     return { ...base, height: l.h, backgroundColor: l.color, borderRadius: l.radius || 0 };
   }
+  if (l.kind === 'chart') return { ...base, height: l.h };
   if (l.kind === 'image') {
     return { ...base, height: l.h, objectFit: 'cover', borderRadius: l.radius || 0, display: 'block' };
   }

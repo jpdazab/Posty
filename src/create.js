@@ -9,7 +9,8 @@ import { $, esc, toast, copy, linkedinIcon } from './ui.js';
 import { postFromText, analyzeText, clip } from './autolayout.js';
 import { builtinPost, customPost, BUILTIN_TEMPLATES } from './templates.js';
 import { getKit, getCustomTemplate, setTemplateContent } from './kit.js';
-import { textLayers } from './layer-style.js';
+import { textLayers, postLayers, isText } from './layer-style.js';
+import { CHART_TYPES } from './charts.js';
 import { getBackend } from './backend.js';
 import {
   normalizePost,
@@ -367,10 +368,22 @@ function renderGraphicEditor(post) {
     return `
       <fieldset class="ed-group">
         <legend>${esc(tpl.name)}</legend>
-        ${textLayers(tpl)
-          .map(
-            (l) => `<label class="ed-field"><span>${esc(l.name)}</span><textarea data-field="fields.${esc(l.id)}" rows="2">${esc(post.fields[l.id] ?? '')}</textarea></label>`,
-          )
+        ${postLayers(tpl)
+          .map((l) => {
+            if (isText(l)) return `<label class="ed-field"><span>${esc(l.name)}</span><textarea data-field="fields.${esc(l.id)}" rows="2">${esc(post.fields[l.id] ?? '')}</textarea></label>`;
+            if (l.kind === 'image') {
+              const chosen = Boolean(post.images?.[l.id]);
+              return `<div class="ed-field"><span>${esc(l.name || 'Imagen')}</span>
+                <div class="actions start">
+                  <label class="btn ghost small">${chosen || l.assetId ? 'Cambiar imagen' : 'Elegir imagen'}<input type="file" accept="image/*" data-post-image="${esc(l.id)}" hidden /></label>
+                  ${chosen ? `<button class="link danger" data-create-action="clear-image" data-layer="${esc(l.id)}">${l.assetId ? 'Volver a la de la plantilla' : 'Quitar'}</button>` : ''}
+                </div>
+                <small class="muted">${chosen ? 'Imagen elegida para este post.' : l.assetId ? 'Ahora se usa la imagen de la plantilla.' : 'Sin imagen: el hueco no sale en el PNG.'}</small></div>`;
+            }
+            return `<label class="ed-field"><span>${esc(l.name || 'Gráfica')} <em class="bb">${esc(CHART_TYPES[l.chart] || 'Gráfica')}</em></span>
+              <textarea data-field="charts.${esc(l.id)}" rows="4" placeholder="48% | Research">${esc(post.charts?.[l.id] ?? l.data ?? '')}</textarea>
+              <small class="muted">Una línea por dato: valor | etiqueta (por ejemplo, "48% | Research").</small></label>`;
+          })
           .join('')}
       </fieldset>`;
   }
@@ -790,6 +803,10 @@ async function handle(btn) {
       toast('Cambios guardados');
       renderCreate();
       break;
+    case 'clear-image':
+      delete post.images[btn.dataset.layer];
+      renderCreate();
+      break;
     case 'add-item':
       post.card.items.push({ title: '', description: '' });
       renderCreate();
@@ -849,6 +866,15 @@ function handleInput(e) {
 
 async function handleImage(e) {
   const el = e.target;
+  if (el.type === 'file' && el.dataset.postImage && el.files[0] && state.result) {
+    try {
+      state.result.images = { ...(state.result.images || {}), [el.dataset.postImage]: await readImage(el.files[0]) };
+      renderCreate();
+    } catch (err) {
+      toast(err.message);
+    }
+    return;
+  }
   if (el.type !== 'file' || !el.dataset.image || !el.files[0]) return;
   try {
     getPath(state.result, el.dataset.image).visual.src = await readImage(el.files[0]);

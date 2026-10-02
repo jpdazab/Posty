@@ -129,6 +129,8 @@ export function customPost(id) {
     text: '',
     hashtags: [],
     fields: Object.fromEntries(textLayers(tpl).map((l) => [l.id, l.sample || ''])),
+    images: {},
+    charts: Object.fromEntries((tpl.layers || []).filter((l) => l.kind === 'chart').map((l) => [l.id, l.data || ''])),
   };
 }
 

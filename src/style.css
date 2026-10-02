@@ -706,3 +706,5 @@ body.wizard-open { overflow: hidden; }
 .password-field input { width: 100%; padding-right: 76px; }
 .password-field .link { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.85rem; }
 .password-form { display: flex; flex-direction: column; gap: 10px; max-width: 360px; }
+.ds-img-empty { display: grid; place-items: center; background: repeating-linear-gradient(45deg, #d9d9de 0 20px, #e9e9ee 20px 40px); color: #555; font: 600 32px/1.3 system-ui, sans-serif; }
+.te-chart svg, .ds-chart svg { display: block; overflow: visible; }
