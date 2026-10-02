@@ -386,16 +386,14 @@ export function renderDesigns() {
         <label class="btn ghost small">⬆ Importar kit<input type="file" accept="application/json" data-kit-import hidden /></label>
       </div>
     </header>
-    ${
-      ui.draft
-        ? '<div id="tpl-editor-root"></div>'
-        : `<div class="mode-switch" role="tablist">
-             <button role="tab" class="chip ${ui.tab === 'plantillas' ? 'active' : ''}" aria-selected="${ui.tab === 'plantillas'}" data-design-action="tab" data-tab="plantillas">Plantillas</button>
-             <button role="tab" class="chip ${ui.tab === 'marca' ? 'active' : ''}" aria-selected="${ui.tab === 'marca'}" data-design-action="tab" data-tab="marca">Colores y tipografía</button>
-           </div>
-           ${ui.tab === 'plantillas' ? renderTemplates() : renderBrand()}`
-    }
-    ${renderGenModal()}`;
+    <div class="mode-switch" role="tablist">
+      <button role="tab" class="chip ${ui.tab === 'plantillas' ? 'active' : ''}" aria-selected="${ui.tab === 'plantillas'}" data-design-action="tab" data-tab="plantillas">Plantillas</button>
+      <button role="tab" class="chip ${ui.tab === 'marca' ? 'active' : ''}" aria-selected="${ui.tab === 'marca'}" data-design-action="tab" data-tab="marca">Colores y tipografía</button>
+    </div>
+    ${ui.draft ? '' : ui.tab === 'plantillas' ? renderTemplates() : renderBrand()}
+    ${renderGenModal()}
+    ${ui.draft ? '<div class="editor-modal" role="dialog" aria-modal="true" aria-label="Editor de plantilla"><div id="tpl-editor-root"></div></div>' : ''}`;
+  // El editor de plantillas se abre a pantalla completa por encima de Diseños.
   if (ui.draft) mountEditor(root);
   else {
     editor?.destroy();

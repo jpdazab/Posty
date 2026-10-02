@@ -179,7 +179,10 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
     if (!wrap) return;
     const { w, h } = size();
     const avail = wrap.parentElement.clientWidth - 2;
-    const maxH = Math.max(320, window.innerHeight - 190);
+    // A pantalla completa: el alto del área central (menos la nota de atajos); si no, el de la ventana.
+    const center = wrap.parentElement;
+    const fixedHeight = getComputedStyle(center).overflowY === 'auto' ? center.clientHeight - 56 : 0;
+    const maxH = Math.max(320, fixedHeight > 200 ? fixedHeight : window.innerHeight - 190);
     ed.scale = Math.min(avail / w, maxH / h, 1);
     const stage = q('.te-stage');
     stage.style.width = `${w}px`;
