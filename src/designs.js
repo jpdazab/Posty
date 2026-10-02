@@ -59,19 +59,19 @@ function templateCard({ key, name, description, badge, actions }) {
 
 // ---------- Generar diseños (desde una URL o un texto, sin IA) ----------
 
-function renderGenerator() {
+// Modal a todo el ancho; se oculta mientras se edita una propuesta y vuelve al salir del editor.
+function renderGenModal() {
   const g = ui.gen;
-  if (!g) {
-    return `<div class="gen-cta"><div><strong>¿No sabes por dónde empezar?</strong><span class="muted small">Pega un texto, la dirección de un artículo o sube un PDF y Posty te propone plantillas.</span></div>
-      <button class="btn primary" data-design-action="gen-open">✳ Generar diseños</button></div>`;
-  }
+  if (!g || ui.draft) return '';
   const colors = g.page?.colors || [];
   return `
-    <section class="topics-card gen-designs">
-      <div class="topics-head">
-        <div><h2>Generar diseños</h2><p class="muted small">Sin IA: Posty reparte el contenido en varias composiciones con tus colores y tipografías.</p></div>
-        <button class="btn ghost small" data-design-action="gen-close">Cerrar</button>
-      </div>
+    <div class="modal-backdrop gen-modal" role="dialog" aria-modal="true" aria-labelledby="gen-title">
+    <section class="modal-card gen-designs">
+      <header class="modal-head">
+        <div><h2 id="gen-title">Generar diseños</h2><p class="muted small">Desde una web, un texto o un PDF. Sin IA: Posty reparte el contenido en varias composiciones con tus colores y tipografías.</p></div>
+        <button class="icon-btn modal-close" data-design-action="gen-close" aria-label="Cerrar" title="Cerrar (Esc)">×</button>
+      </header>
+      <div class="modal-body">
       <div class="mode-switch" role="tablist">
         <button role="tab" class="chip ${g.source === 'url' ? 'active' : ''}" aria-selected="${g.source === 'url'}" data-design-action="gen-source" data-source="url">Desde una URL</button>
         <button role="tab" class="chip ${g.source === 'text' ? 'active' : ''}" aria-selected="${g.source === 'text'}" data-design-action="gen-source" data-source="text">Desde un texto</button>
@@ -79,7 +79,9 @@ function renderGenerator() {
       </div>
       ${g.source === 'pdf' ? renderPdfSource(g) : renderTextUrlSource(g, colors)}
       ${renderGenResults(g)}
-    </section>`;
+      </div>
+    </section>
+    </div>`;
 }
 
 function renderPdfSource(g) {
@@ -143,11 +145,7 @@ function renderGenResults(g) {
 }
 
 function renderTemplates() {
-  const kit = getKit();
-  const empty = !kit.builtins && !kit.customTemplates.length;
-  // Sin plantillas: el estado vacío ya ofrece generar; con el panel abierto no hace falta repetirlo.
-  if (empty) return ui.gen ? renderGenerator() : renderTemplateList(kit);
-  return renderGenerator() + renderTemplateList(kit);
+  return renderTemplateList(getKit());
 }
 
 function renderTemplateList(kit) {
@@ -382,6 +380,8 @@ export function renderDesigns() {
         <p class="muted">Tus plantillas y tu marca: colores, tipografías, firma y logo.</p>
       </div>
       <div class="actions">
+        <button class="btn primary small" data-design-action="gen-open">✳ Generar diseños</button>
+        <button class="btn ghost small" data-design-action="new-custom">+ Nueva plantilla</button>
         <button class="btn ghost small" data-design-action="export-kit">⬇ Exportar kit</button>
         <label class="btn ghost small">⬆ Importar kit<input type="file" accept="application/json" data-kit-import hidden /></label>
       </div>
@@ -394,7 +394,8 @@ export function renderDesigns() {
              <button role="tab" class="chip ${ui.tab === 'marca' ? 'active' : ''}" aria-selected="${ui.tab === 'marca'}" data-design-action="tab" data-tab="marca">Colores y tipografía</button>
            </div>
            ${ui.tab === 'plantillas' ? renderTemplates() : renderBrand()}`
-    }`;
+    }
+    ${renderGenModal()}`;
   if (ui.draft) mountEditor(root);
   else {
     editor?.destroy();
@@ -563,9 +564,8 @@ async function handle(btn) {
   switch (action) {
     case 'gen-open':
       ui.gen = { source: 'url', url: '', text: '', size: '1080x1350', siteColors: true, loading: false, error: null, page: null, content: null, results: [], savedIds: {} };
-      ui.tab = 'plantillas';
       renderDesigns();
-      $('#designs-root [data-gen-field="url"]')?.focus();
+      $('#designs-root .gen-modal [data-gen-field="url"]')?.focus();
       break;
     case 'gen-close':
       dropGenImage();
@@ -590,7 +590,13 @@ async function handle(btn) {
       break;
     case 'gen-use': {
       const savedId = await persistGenerated(id);
-      startFromTemplate({ ...customPost(savedId), text: postTextFromSource() });
+      const text = postTextFromSource();
+      // Se cierra el modal: la plantilla ya está guardada y el post se abre en Crear post.
+      dropGenImage();
+      setTempTemplates([]);
+      ui.gen = null;
+      renderDesigns();
+      startFromTemplate({ ...customPost(savedId), text });
       location.hash = '#/crear';
       break;
     }
@@ -747,6 +753,12 @@ function handleInput(e) {
 
 export function initDesignsPage() {
   const root = $('#designs-root');
+  // Esc cierra el modal de Generar diseños (si está a la vista y no se está escribiendo en el editor).
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !ui.gen || ui.draft || root.hidden || ui.gen.loading) return;
+    const btn = root.querySelector('.gen-modal [data-design-action="gen-close"]');
+    if (btn) handle(btn);
+  });
   root.addEventListener('click', async (e) => {
     const brandBtn = e.target.closest('[data-brand-action]');
     if (brandBtn && (await brandClick(brandBtn, rerenderBrand))) return;
