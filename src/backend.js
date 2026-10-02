@@ -170,7 +170,7 @@ export function cloudBackend(client, user) {
     },
 
     async listCreated() {
-      const rows = check(await client.from('created_posts').select('data').order('updated_at', { ascending: false }).limit(50));
+      const rows = check(await client.from('created_posts').select('data').order('updated_at', { ascending: false }).limit(200));
       return rows.map((r) => r.data);
     },
     async saveCreated(post) {

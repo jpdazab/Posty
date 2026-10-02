@@ -30,7 +30,8 @@ import {
 } from './visuals.js';
 
 const CODE_KEY = 'posty:access-code';
-const MAX_HISTORY = 20;
+// En la cuenta caben muchos; en el navegador (modo local) el espacio es limitado.
+const maxHistory = () => (getBackend().mode === 'cloud' ? 200 : 20);
 
 const FORMAT_LABELS = { carousel: 'Carrusel', card: 'Card', slide: 'Card única (carrusel)', custom: 'Plantilla propia' };
 const TONE_LABELS = { blue: 'Azul', ink: 'Negro', grey: 'Gris', yellow: 'Amarillo' };
@@ -74,6 +75,7 @@ const state = {
   fullscreen: false, // post a la vista: pantalla completa con el texto a la izquierda y el diseño a la derecha
   aiImage: null, // { target: 'layer:<id>' | 'visual:<ruta>', ratio, prompt, quality, loading, error }
   seedTitle: '', // título de la propuesta del AI Digest que se está diseñando
+  returnTo: null, // 'posts' si el post se abrió desde My posts
   publishHelp: false, // guía «Terminar en LinkedIn» tras pulsar Publicar
 };
 
@@ -107,7 +109,35 @@ export async function initCreateData() {
 // Al volver a la pestaña (por ejemplo, tras crear un post desde Claude) se recarga la lista.
 export async function refreshCreated() {
   history = (await getBackend().listCreated()) || [];
-  if (state.step === 'prompt' && !document.querySelector('#create-root')?.hidden) renderCreate();
+  notifyHistory();
+}
+
+// My posts (posts.js) se vuelve a dibujar cuando cambia la lista.
+const historyListeners = new Set();
+export function onHistoryChange(fn) {
+  historyListeners.add(fn);
+}
+function notifyHistory() {
+  for (const fn of historyListeners) fn(history);
+}
+
+export function getCreated() {
+  return history;
+}
+
+// Desde My posts: abrir un post en la vista a pantalla completa; al cerrarlo se vuelve allí.
+export function openCreated(id) {
+  const found = history.find((p) => p.id === id);
+  if (!found) return false;
+  const result = normalizePost(found);
+  Object.assign(state, { mode: result.prompt ? 'ai' : 'manual', prompt: result.prompt || '', templateEdit: null, returnTo: 'posts' });
+  showResult(result);
+  location.hash = '#/crear';
+  return true;
+}
+
+export function deleteCreated(id) {
+  deleteFromHistory(id);
 }
 
 function storageError(err) {
@@ -116,13 +146,15 @@ function storageError(err) {
 }
 
 function saveToHistory(post) {
-  history = [post, ...history.filter((p) => p.id !== post.id)].slice(0, MAX_HISTORY);
+  history = [post, ...history.filter((p) => p.id !== post.id)].slice(0, maxHistory());
   getBackend().saveCreated(post, history).catch(storageError);
+  notifyHistory();
 }
 
 function deleteFromHistory(id) {
   history = history.filter((p) => p.id !== id);
   getBackend().deleteCreated(id, history).catch(storageError);
+  notifyHistory();
 }
 
 // ---------- Utilidades ----------
@@ -679,29 +711,6 @@ function renderCodeForm() {
     </label>`;
 }
 
-function renderHistory() {
-  if (!history.length) return '';
-  return `
-    <h2 class="section-title">Creados recientemente</h2>
-    <ul class="history">
-      ${history
-        .map(
-          (p) => `
-        <li class="history-row">
-          <button class="history-item" data-create-action="open" data-id="${esc(p.id)}">
-            <span class="badge badge-pendiente">${FORMAT_LABELS[p.format] || p.format}</span>
-            <span class="history-title">${esc(p.title || 'Sin título')}</span>
-            <span class="muted small">${esc(new Date(p.createdAt).toLocaleDateString('es', { day: 'numeric', month: 'short' }))}</span>
-          </button>
-          <button class="icon-btn" data-create-action="delete" data-id="${esc(p.id)}" aria-label="Borrar ${esc(p.title || 'post')}" title="Borrar">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-        </li>`,
-        )
-        .join('')}
-    </ul>`;
-}
-
 function mountPreview() {
   const preview = $('#gen-preview');
   if (preview && state.result) mountPages(preview, state.result);
@@ -718,7 +727,7 @@ export function renderCreate() {
       <p class="muted">Pide un post a Claude, pega tu texto o empieza desde cero. La gráfica sale con tus plantillas, lista para LinkedIn.</p>
     </header>
     <section class="conversation" aria-live="polite">${full ? renderComposer() : renderConversation()}</section>
-    ${state.step === 'prompt' || full ? renderHistory() : ''}
+    ${state.step === 'prompt' && history.length ? `<p class="muted small create-posts-link">Tus posts guardados están en <a href="#/posts" data-create-action="go-posts">My posts →</a></p>` : ''}
     ${full ? renderFullscreen(state.result) : ''}`;
   if (full) fitFullscreenFrames();
   mountPreview();
@@ -820,8 +829,17 @@ export function editTemplate(id) {
   showResult(normalizePost(builtinPost(id)), { editing: true, isNew: false });
 }
 
+// Cerrar el post a pantalla completa: vuelve a My posts si se abrió desde allí.
+function closeFull() {
+  const back = state.returnTo;
+  // Abrir un post de My posts no cambia el modo con el que se empieza en Crear post.
+  if (back === 'posts') state.mode = 'ai';
+  resetToStart();
+  if (back === 'posts') location.hash = '#/posts';
+}
+
 function resetToStart() {
-  Object.assign(state, { step: 'prompt', prompt: '', format: null, result: null, editing: false, snapshot: null, isNew: false, fullscreen: false, aiImage: null, seedTitle: '', publishHelp: false });
+  Object.assign(state, { step: 'prompt', prompt: '', format: null, result: null, editing: false, snapshot: null, isNew: false, fullscreen: false, aiImage: null, seedTitle: '', publishHelp: false, returnTo: null });
   renderCreate();
 }
 
@@ -884,6 +902,10 @@ async function handle(btn) {
     case 'new':
       resetToStart();
       break;
+    case 'go-posts':
+      resetToStart();
+      location.hash = '#/posts';
+      break;
     case 'close-page':
       closeCreate();
       break;
@@ -901,7 +923,7 @@ async function handle(btn) {
       if (!target || !window.confirm(`¿Borrar "${target.title || 'este post'}"? No se puede deshacer.`)) return;
       deleteFromHistory(target.id);
       toast('Post borrado');
-      if (state.result?.id === target.id) resetToStart();
+      if (state.result?.id === target.id) closeFull();
       else renderCreate();
       break;
     }
@@ -972,7 +994,7 @@ async function handle(btn) {
       renderCreate();
       break;
     case 'close-full':
-      resetToStart();
+      closeFull();
       break;
     case 'ai-image-open':
       state.aiImage = { target: btn.dataset.target, ratio: Number(btn.dataset.ratio) || 1, prompt: suggestPrompt(post), quality: 'medium', loading: false, error: null };
@@ -1139,7 +1161,7 @@ export function initCreatePage() {
     if (e.key !== 'Escape' || root.hidden || state.editing || e.defaultPrevented) return;
     if (e.target.closest?.('input, textarea, select') || document.querySelector('.modal-backdrop')) return;
     // Primero se cierra el post abierto; con la pantalla de inicio a la vista, se cierra Crear post.
-    if (state.fullscreen) resetToStart();
+    if (state.fullscreen) closeFull();
     else if (state.step === 'prompt') closeCreate();
   });
 }

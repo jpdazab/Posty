@@ -1,7 +1,8 @@
 import { parseWeek, composePost, linkedInShareUrl, splitList, LINKEDIN_MAX_CHARS } from './parser.js';
 import { STATUSES, getPostState, getStatus, updatePost, initStore } from './store.js';
 import { $, esc, toast, copy, linkedinIcon } from './ui.js';
-import { initCreatePage, startFromDigest, renderCreate, initCreateData, refreshCreated } from './create.js';
+import { initCreatePage, startFromDigest, renderCreate, initCreateData, refreshCreated, getCreated, onHistoryChange } from './create.js';
+import { initPostsPage, renderPosts } from './posts.js';
 import { initDesignsPage, renderDesigns, afterWizard, prepareDesigns } from './designs.js';
 import { initKit, getKit } from './kit.js';
 import { showWizard } from './wizard.js';
@@ -469,8 +470,8 @@ $('#publish-dialog').addEventListener('close', () => {
 
 // ---------- Navegación ----------
 
-const ROUTES = ['digest', 'crear', 'disenos', 'cuenta'];
-const TITLES = { crear: 'Crear post', disenos: 'Templates', digest: 'AI Digest', cuenta: 'Cuenta' };
+const ROUTES = ['digest', 'posts', 'crear', 'disenos', 'cuenta'];
+const TITLES = { crear: 'Crear post', disenos: 'Templates', posts: 'My posts', digest: 'AI Digest', cuenta: 'Cuenta' };
 
 function route() {
   const name = location.hash.replace(/^#\/?/, '');
@@ -498,6 +499,7 @@ function showRoute() {
   if (current !== 'crear') lastRoute = current;
   if (current === 'crear') renderCreate();
   if (current === 'disenos') renderDesigns();
+  if (current === 'posts') renderPosts();
   if (current === 'cuenta') renderAccount();
   window.scrollTo(0, 0);
 }
@@ -535,6 +537,10 @@ async function start() {
   }
   initCreatePage();
   initDesignsPage();
+  initPostsPage();
+  const postsCount = () => ($('#nav-posts-count').textContent = getCreated().length || '');
+  postsCount();
+  onHistoryChange(postsCount);
   initAccountPage();
   initTopicsPanel();
   renderTopics();
