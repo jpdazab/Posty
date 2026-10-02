@@ -8,7 +8,7 @@
 
 import { esc, toast } from './ui.js';
 import { assetUrl, cachedAssetUrl, deleteAsset } from './assets-db.js';
-import { getKit, allFontFamilies, storeImage, CUSTOM_SIZES } from './kit.js';
+import { getKit, allFontFamilies, storeImage, setLogo, CUSTOM_SIZES } from './kit.js';
 import { customSize } from './templates.js';
 import { layerCss, isText } from './layer-style.js';
 import { contrast } from './layouts.js';
@@ -288,7 +288,7 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
              ${t.overlay ? `<div class="ed-row">${field('Color', `<input type="color" data-te-tpl="overlay.color" value="${esc(t.overlay.color)}" />`)}${field('Opacidad', `<input type="range" min="0" max="0.9" step="0.05" data-te-tpl="overlay.opacity" value="${esc(t.overlay.opacity)}" />`)}</div>` : ''}`
           : ''
       }
-      ${hasLogo ? `<label class="check"><input type="checkbox" data-te-tpl="logo.show" ${t.logo?.show ? 'checked' : ''} /> Mostrar mi logo</label>` : '<p class="muted small">Sube tu logo en Colores y tipografía para usarlo aquí.</p>'}
+      ${hasLogo ? `<label class="check"><input type="checkbox" data-te-tpl="logo.show" ${t.logo?.show ? 'checked' : ''} /> Mostrar mi logo</label>` : '<button class="btn ghost small" data-te="upload-logo">Subir mi logo</button>'}
       <p class="muted small">Selecciona un elemento del lienzo para cambiarlo. Al crear un post, el primer texto recibe el titular y el segundo el texto (mira las etiquetas en Capas).</p>`;
   }
 
@@ -432,10 +432,33 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
   }
 
   // ---------- Altas, bajas y orden ----------
+  function pickLogo(at) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.addEventListener('change', async () => {
+      const file = input.files[0];
+      if (!file) return;
+      toast('Subiendo tu logo…');
+      try {
+        await setLogo(file);
+        await assetUrl(getKit().theme.logoAssetId);
+      } catch (err) {
+        toast(err.message || 'No se pudo subir el logo');
+        return;
+      }
+      if (!container.isConnected) return;
+      addBlock('logo', at);
+      toast('Logo añadido ✓ (queda guardado en Colores y tipografía)');
+    });
+    input.click();
+  }
+
   function addBlock(type, at) {
     if (type === 'logo') {
       if (!getKit().theme.logoAssetId) {
-        toast('Sube primero tu logo en Templates → Colores y tipografía');
+        // Sin logo todavía: se sube aquí mismo y queda guardado también en Colores y tipografía.
+        pickLogo(at);
         return;
       }
       change(() => {
@@ -797,6 +820,8 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
           renderProps();
         }
         return;
+      case 'upload-logo':
+        return pickLogo();
       case 'remove-bg':
         change(() => {
           ed.tpl.bgAssetId = null;
