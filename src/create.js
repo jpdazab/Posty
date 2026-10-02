@@ -44,7 +44,7 @@ const MODES = {
     label: 'Pegar mi texto',
     placeholder: 'Pega aquí el texto de tu post. Posty usará la primera línea como titular, las listas y cifras para la gráfica y la pregunta final para cerrar.',
     submit: 'Crear diseño →',
-    user: (s) => `<span class="muted small">Texto pegado</span><br>${esc(s.prompt.length > 220 ? `${s.prompt.slice(0, 220)}…` : s.prompt)}`,
+    user: (s) => `<span class="muted small">${s.seedTitle ? `Propuesta del AI Digest · ${esc(s.seedTitle)}` : 'Texto pegado'}</span><br>${esc(s.prompt.length > 220 ? `${s.prompt.slice(0, 220)}…` : s.prompt)}`,
   },
   manual: { label: 'Desde cero', submit: 'Elegir formato →', user: () => 'Quiero escribirlo desde cero' },
 };
@@ -762,14 +762,24 @@ async function generate() {
 // Crea el post del formato elegido según el modo (pegar texto o desde cero).
 function createLocal(format, templateId) {
   state.format = format;
+  // Propuesta del AI Digest: se conserva su título interno.
+  const title = state.seedTitle;
+  state.seedTitle = '';
+  const show = (post, opts) => showResult(title ? { ...post, title } : post, opts);
   if (format === 'custom') {
     const post = state.mode === 'paste' ? customFromText(state.prompt, templateId) : blankPost('custom', templateId);
-    showResult(post, { editing: true, isNew: true });
+    show(post, { editing: true, isNew: true });
   } else if (state.mode === 'paste') {
-    showResult(normalizePost({ ...postFromText(state.prompt, format), ...newMeta() }), { editing: true, isNew: true });
+    show(normalizePost({ ...postFromText(state.prompt, format), ...newMeta() }), { editing: true, isNew: true });
   } else {
-    showResult(blankPost(format), { editing: true, isNew: true });
+    show(blankPost(format), { editing: true, isNew: true });
   }
+}
+
+// Desde el AI Digest: el texto de una propuesta pasa a Crear post y se elige la plantilla.
+export function startFromDigest({ title, text }) {
+  Object.assign(state, { mode: 'paste', prompt: text, format: null, result: null, error: null, editing: false, isNew: false, templateEdit: null, fullscreen: false, aiImage: null, seedTitle: title || '', step: 'format' });
+  renderCreate();
 }
 
 // Desde Diseños: crear un post a partir de una plantilla.
@@ -785,7 +795,7 @@ export function editTemplate(id) {
 }
 
 function resetToStart() {
-  Object.assign(state, { step: 'prompt', prompt: '', format: null, result: null, editing: false, snapshot: null, isNew: false, fullscreen: false, aiImage: null });
+  Object.assign(state, { step: 'prompt', prompt: '', format: null, result: null, editing: false, snapshot: null, isNew: false, fullscreen: false, aiImage: null, seedTitle: '' });
   renderCreate();
 }
 
@@ -819,6 +829,7 @@ async function handle(btn) {
       break;
     case 'back':
       state.step = 'prompt';
+      state.seedTitle = '';
       renderCreate();
       break;
     case 'retry': {

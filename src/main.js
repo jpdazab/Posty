@@ -1,7 +1,7 @@
 import { parseWeek, composePost, linkedInShareUrl, splitList, LINKEDIN_MAX_CHARS } from './parser.js';
 import { STATUSES, getPostState, getStatus, updatePost, exportState, importState, initStore } from './store.js';
 import { $, esc, toast, copy, linkedinIcon } from './ui.js';
-import { initCreatePage, renderCreate, initCreateData, refreshCreated } from './create.js';
+import { initCreatePage, startFromDigest, renderCreate, initCreateData, refreshCreated } from './create.js';
 import { initDesignsPage, renderDesigns, afterWizard, prepareDesigns } from './designs.js';
 import { initKit, getKit } from './kit.js';
 import { showWizard } from './wizard.js';
@@ -236,6 +236,7 @@ function renderPost(post) {
       <button class="btn primary" data-action="publish" data-id="${esc(post.id)}">${linkedinIcon()} Publicar</button>
       <button class="btn ghost" data-action="copy" data-id="${esc(post.id)}">Copiar</button>
       <button class="btn ghost" data-action="edit" data-id="${esc(post.id)}">Editar</button>
+      <button class="btn ghost" data-action="design" data-id="${esc(post.id)}">🎨 Crear diseño</button>
       ${status === 'pendiente'
         ? `<button class="btn ghost ok" data-action="status" data-status="aprobado" data-id="${esc(post.id)}">Aprobar</button>`
         : `<button class="btn ghost" data-action="status" data-status="pendiente" data-id="${esc(post.id)}">Quitar aprobación</button>`}
@@ -367,6 +368,11 @@ async function handleAction(btn) {
       break;
     case 'copy':
       toast((await copy(finalText(post))) ? 'Texto copiado ✓' : 'No se pudo copiar');
+      break;
+    case 'design':
+      // El texto (con los cambios y hashtags) pasa a Crear post para elegir plantilla.
+      startFromDigest({ title: post.title, text: finalText(post) });
+      location.hash = '#/crear';
       break;
     case 'mark-published':
       openPublishDialog(id);
