@@ -68,6 +68,7 @@ const state = {
   isNew: false, // post todavía no guardado (pegado o desde cero)
   templateEdit: null, // id de plantilla integrada cuyo contenido por defecto se está editando
   needsCode: false,
+  fullscreen: false, // post abierto desde "Creados recientemente": vista a pantalla completa
   aiImage: null, // { target: 'layer:<id>' | 'visual:<ruta>', ratio, prompt, quality, loading, error }
 };
 
@@ -540,6 +541,63 @@ function renderResult(post) {
     </div>`;
 }
 
+// Post ya creado a pantalla completa: texto a la izquierda y diseño a la derecha.
+// "Editar" cambia la columna izquierda por el editor; la derecha sigue siendo la vista previa en vivo.
+function renderFullscreen(post) {
+  const text = finalText(post);
+  const over = text.length > LINKEDIN_MAX_CHARS;
+  const editing = state.editing;
+  const created = post.createdAt ? new Date(post.createdAt).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  return `
+    <div class="post-modal" role="dialog" aria-modal="true" aria-label="${esc(post.title || 'Post')}">
+      <header class="pm-bar">
+        <button class="btn ghost small" data-create-action="${editing ? 'cancel-edit' : 'close-full'}">← ${editing ? 'Volver sin guardar' : 'Volver'}</button>
+        <div class="pm-title"><strong>${esc(post.title || 'Sin título')}</strong><span class="badge badge-aprobado">${esc(FORMAT_LABELS[post.format] || '')}</span></div>
+        <div class="actions">
+          ${
+            editing
+              ? '<button class="btn primary small" data-create-action="done-edit">Guardar</button>'
+              : `<button class="btn primary small" data-create-action="publish">${linkedinIcon()} Publicar</button>
+                 <button class="btn ghost small" data-create-action="copy">Copiar texto</button>
+                 <button class="btn ghost small" data-create-action="edit">Editar</button>
+                 <button class="btn ghost small" data-create-action="png">⬇ ${post.format === 'carousel' ? 'PNGs' : 'PNG'}</button>
+                 ${post.format === 'carousel' ? '<button class="btn ghost small" data-create-action="pdf">⬇ PDF</button>' : ''}
+                 <button class="btn ghost small danger" data-create-action="delete" data-id="${esc(post.id)}">Borrar</button>`
+          }
+        </div>
+      </header>
+      <div class="pm-body">
+        <section class="pm-text">
+          ${
+            editing
+              ? renderEditor(post)
+              : `<p class="muted small">Texto para LinkedIn${created ? ` · creado el ${esc(created)}` : ''}</p>
+                 <div class="pm-post-text">${esc(post.text) || '<span class="muted">Sin texto todavía. Pulsa Editar para escribirlo.</span>'}</div>
+                 ${post.hashtags.length ? `<p class="hashtags">${esc(post.hashtags.join(' '))}</p>` : ''}
+                 <p class="count ${over ? 'over' : ''}">${text.length.toLocaleString('es')} / ${LINKEDIN_MAX_CHARS.toLocaleString('es')} caracteres${over ? ' · supera el límite de LinkedIn' : ''}</p>`
+          }
+        </section>
+        <section class="pm-design"><div class="gen-preview" id="gen-preview">${renderPreview(post)}</div></section>
+      </div>
+    </div>`;
+}
+
+// Cada gráfica del lado derecho ocupa todo el alto disponible sin salirse del ancho.
+function fitFullscreenFrames() {
+  const panel = document.querySelector('#create-root .pm-design');
+  if (!panel) return;
+  const pad = 40;
+  const carousel = panel.querySelector('.gen-gallery');
+  for (const frame of panel.querySelectorAll('.visual-frame')) {
+    const [w, h] = String(frame.style.aspectRatio || '1 / 1').split('/').map((n) => parseFloat(n));
+    const ratio = w && h ? w / h : 1;
+    const maxH = panel.clientHeight - pad - (carousel ? 16 : 0);
+    const maxW = carousel ? panel.clientWidth * 0.85 : panel.clientWidth - pad;
+    frame.style.width = `${Math.max(120, Math.min(maxW, maxH * ratio))}px`;
+  }
+  fitVisuals(panel);
+}
+
 function renderConversation() {
   if (state.step === 'prompt') return renderComposer();
   const parts = [bubble('user', `<p>${MODES[state.mode].user(state)}</p>`)];
@@ -619,15 +677,19 @@ function mountPreview() {
 export function renderCreate() {
   const root = $('#create-root');
   unmountPages(root);
+  const full = state.fullscreen && state.result;
   root.innerHTML = `
     <header class="page-head">
       <h1>Crear post</h1>
       <p class="muted">Pide un post a Claude, pega tu texto o empieza desde cero. La gráfica sale con tus plantillas, lista para LinkedIn.</p>
     </header>
-    <section class="conversation" aria-live="polite">${renderConversation()}</section>
-    ${state.step === 'prompt' ? renderHistory() : ''}`;
+    <section class="conversation" aria-live="polite">${full ? renderComposer() : renderConversation()}</section>
+    ${state.step === 'prompt' || full ? renderHistory() : ''}
+    ${full ? renderFullscreen(state.result) : ''}`;
+  if (full) fitFullscreenFrames();
   mountPreview();
-  if (state.step === 'prompt') $('#create-prompt')?.focus();
+  if (full) fitFullscreenFrames();
+  if (state.step === 'prompt' && !full) $('#create-prompt')?.focus();
 }
 
 let previewTimer;
@@ -638,7 +700,8 @@ function schedulePreview() {
 
 // ---------- Acciones ----------
 
-function showResult(post, { editing = false, isNew = false } = {}) {
+function showResult(post, { editing = false, isNew = false, fullscreen = false } = {}) {
+  state.fullscreen = fullscreen;
   state.result = post;
   state.aiImage = null;
   state.format = post.format;
@@ -711,7 +774,7 @@ export function editTemplate(id) {
 }
 
 function resetToStart() {
-  Object.assign(state, { step: 'prompt', prompt: '', format: null, result: null, editing: false, snapshot: null, isNew: false });
+  Object.assign(state, { step: 'prompt', prompt: '', format: null, result: null, editing: false, snapshot: null, isNew: false, fullscreen: false, aiImage: null });
   renderCreate();
 }
 
@@ -779,7 +842,7 @@ async function handle(btn) {
       const result = normalizePost(found);
       state.mode = result.prompt ? 'ai' : 'manual';
       state.prompt = result.prompt || '';
-      showResult(result);
+      showResult(result, { fullscreen: true });
       break;
     }
     case 'delete': {
@@ -837,6 +900,9 @@ async function handle(btn) {
       saveToHistory(post);
       toast('Cambios guardados');
       renderCreate();
+      break;
+    case 'close-full':
+      resetToStart();
       break;
     case 'ai-image-open':
       state.aiImage = { target: btn.dataset.target, ratio: Number(btn.dataset.ratio) || 1, prompt: suggestPrompt(post), quality: 'medium', loading: false, error: null };
@@ -994,5 +1060,14 @@ export function initCreatePage() {
   });
   root.addEventListener('input', handleInput);
   root.addEventListener('change', handleImage);
-  window.addEventListener('resize', () => fitVisuals(root));
+  window.addEventListener('resize', () => {
+    fitVisuals(root);
+    if (state.fullscreen) fitFullscreenFrames();
+  });
+  // Esc cierra el post a pantalla completa (si no se está editando ni escribiendo).
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !state.fullscreen || state.editing || root.hidden) return;
+    if (e.target.closest?.('input, textarea, select')) return;
+    resetToStart();
+  });
 }
