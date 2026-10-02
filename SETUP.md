@@ -117,6 +117,21 @@ y hay que actualizar su rutina.
 
 Sin rutina también se puede: **Cuenta → Subir una semana a mano** (el `.md` y sus imágenes).
 
+## 6b. Conectar Claude (sin API)
+
+Cada persona puede usar su propio Claude (planes Pro, Max, Team o Enterprise) para trabajar con Posty
+desde el chat de Claude, sin gastar la API:
+
+1. En Posty: **Cuenta → Conectar con Claude → Crear token** y **Copiar dirección del conector**
+   (`https://<tu-posty>/api/mcp?token=…`). La dirección lleva el token: no se comparte.
+2. En Claude: **Ajustes → Conectores → Añadir conector personalizado**, nombre `Posty` y esa dirección.
+3. En un chat, activa Posty y pide, por ejemplo: *"Prepara mis propuestas de la semana que viene con mis
+   temas de Posty"* o *"Crea un post con mi plantilla Dato del día sobre…"*.
+
+Las propuestas aparecen en el AI Digest y los posts con diseño en Crear post (al volver a la pestaña de
+Posty se actualiza solo). El token es el mismo de la rutina semanal: si se crea uno nuevo, hay que
+actualizar el conector y la rutina.
+
 ## 7. Pasar las semanas que ya existen (opcional)
 
 Las semanas guardadas en la carpeta `propuestas/` del repositorio ya no se muestran solas.

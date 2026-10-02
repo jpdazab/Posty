@@ -25,6 +25,11 @@ Envía también la tanda a Posty, la plataforma donde reviso y publico los posts
 - Cada respuesta es JSON con "ok": true. Si una petición falla, repítela una vez; si sigue fallando, dilo en el resumen final.`;
 }
 
+// Dirección del conector de Claude (servidor MCP de Posty) con el token personal.
+function connectorUrl(token) {
+  return `${location.origin}/api/mcp?token=${encodeURIComponent(token)}`;
+}
+
 function renderLocal() {
   return `
     <section class="ed-group account-card">
@@ -59,16 +64,27 @@ function renderCloud() {
     </section>
 
     <section class="ed-group account-card">
-      <h2>Rutina semanal</h2>
-      <p class="muted">Tu rutina de Claude envía cada semana las propuestas a tu AI Digest con un token personal. Si creas uno nuevo, el anterior deja de funcionar.</p>
+      <h2>Conectar con Claude</h2>
+      <p class="muted">Usa tu propio Claude (tu plan Pro, Max, Team o Enterprise, sin API) para crear posts y propuestas en Posty desde el chat de Claude. Funciona con un token personal, el mismo que usa tu rutina semanal; si creas uno nuevo, el anterior deja de funcionar en los dos sitios.</p>
       <p>${ui.tokenDate === undefined ? 'Cargando…' : ui.tokenDate ? `Tienes un token creado el ${esc(new Date(ui.tokenDate).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' }))}.` : 'Todavía no has creado un token.'}</p>
       ${
         ui.newToken
           ? `<div class="token-box">
-               <p><strong>Copia este token ahora:</strong> no se volverá a mostrar.</p>
+               <p><strong>Cópialo ahora:</strong> no se volverá a mostrar. La dirección del conector lleva el token dentro: no la compartas.</p>
+               <p class="small"><strong>Conector de Claude</strong></p>
+               <code class="token">${esc(connectorUrl(ui.newToken))}</code>
+               <div class="actions start">
+                 <button class="btn primary small" data-account-action="copy-connector">Copiar dirección del conector</button>
+               </div>
+               <ol class="steps small">
+                 <li>En Claude, abre <strong>Ajustes → Conectores</strong> y pulsa <strong>Añadir conector personalizado</strong>.</li>
+                 <li>Nombre: <strong>Posty</strong>. URL: pega la dirección. Guarda.</li>
+                 <li>En un chat, activa Posty en el menú de herramientas y pídele, por ejemplo: <em>"Prepara mis propuestas de la semana que viene con mis temas de Posty"</em> o <em>"Crea un post con mi plantilla Dato del día sobre…"</em>.</li>
+               </ol>
+               <p class="small"><strong>Rutina semanal</strong></p>
                <code class="token">${esc(ui.newToken)}</code>
                <div class="actions start">
-                 <button class="btn primary small" data-account-action="copy-token">Copiar token</button>
+                 <button class="btn ghost small" data-account-action="copy-token">Copiar token</button>
                  <button class="btn ghost small" data-account-action="copy-snippet">Copiar instrucciones para la rutina</button>
                </div>
              </div>`
@@ -143,6 +159,9 @@ async function handle(btn) {
       break;
     case 'copy-token':
       toast((await copy(ui.newToken)) ? 'Token copiado ✓' : 'No se pudo copiar');
+      break;
+    case 'copy-connector':
+      toast((await copy(connectorUrl(ui.newToken))) ? 'Dirección del conector copiada ✓' : 'No se pudo copiar');
       break;
     case 'copy-snippet':
       toast((await copy(routineSnippet(ui.newToken))) ? 'Instrucciones copiadas ✓' : 'No se pudo copiar');

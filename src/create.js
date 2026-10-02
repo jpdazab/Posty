@@ -96,6 +96,12 @@ export async function initCreateData() {
   history = (await getBackend().listCreated()) || [];
 }
 
+// Al volver a la pestaña (por ejemplo, tras crear un post desde Claude) se recarga la lista.
+export async function refreshCreated() {
+  history = (await getBackend().listCreated()) || [];
+  if (state.step === 'prompt' && !document.querySelector('#create-root')?.hidden) renderCreate();
+}
+
 function storageError(err) {
   console.error(err);
   toast(getBackend().mode === 'local' ? 'No hay espacio en el navegador: borra posts antiguos o usa imágenes más ligeras' : 'No se pudo guardar. Revisa tu conexión.');

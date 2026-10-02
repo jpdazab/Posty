@@ -187,10 +187,9 @@ async function refund(db, userId, n) {
 
 // ---------- Rutinas: token personal ----------
 
-// Devuelve { userId } o { error: respuesta } según el token de la rutina.
-async function routineOwner(db, headers) {
+// Devuelve { userId } o { error: respuesta } según el token personal (rutina o conector de Claude).
+export async function routineOwner(db, headers, token = bearer(headers)) {
   if (!db) return { error: reply(503, { error: 'Posty no tiene Supabase configurado (faltan VITE_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY).' }) };
-  const token = bearer(headers);
   if (!token) return { error: reply(401, { error: 'Falta el token de la rutina (cabecera Authorization: Bearer …).' }) };
   const { data: owner, error } = await db.from('ingest_tokens').select('user_id').eq('token_hash', hashToken(token)).maybeSingle();
   if (error) {
@@ -296,6 +295,9 @@ export function nodeHandler(handler, limit) {
       if (!(err instanceof GenerateError)) console.error(err);
     }
     res.statusCode = result.status;
+    for (const [k, v] of Object.entries(result.headers || {})) res.setHeader(k, v);
+    // Sin cuerpo (por ejemplo, 202 a una notificación MCP).
+    if (result.json === undefined) return res.end();
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.end(JSON.stringify(result.json));
   };

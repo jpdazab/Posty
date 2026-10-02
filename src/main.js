@@ -1,7 +1,7 @@
 import { parseWeek, composePost, linkedInShareUrl, splitList, LINKEDIN_MAX_CHARS } from './parser.js';
 import { STATUSES, getPostState, getStatus, updatePost, exportState, importState, initStore } from './store.js';
 import { $, esc, toast, copy, linkedinIcon } from './ui.js';
-import { initCreatePage, renderCreate, initCreateData } from './create.js';
+import { initCreatePage, renderCreate, initCreateData, refreshCreated } from './create.js';
 import { initDesignsPage, renderDesigns, afterWizard, prepareDesigns } from './designs.js';
 import { initKit, getKit } from './kit.js';
 import { showWizard } from './wizard.js';
@@ -547,6 +547,14 @@ async function start() {
   renderTopics();
   render();
   window.addEventListener('hashchange', showRoute);
+  // Lo que llega desde Claude (conector o rutina) aparece al volver a Posty, sin recargar.
+  let lastRefresh = Date.now();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || Date.now() - lastRefresh < 15000) return;
+    lastRefresh = Date.now();
+    // Si hay una propuesta en edición, no se redibuja el digest para no perder lo escrito.
+    Promise.all([ui.editing.size ? null : reloadWeeks(), refreshCreated()]).catch((err) => console.error(err));
+  });
   showRoute();
   document.body.classList.remove('loading');
   // Primera vez: asistente de marca. Si el kit no se pudo cargar no se muestra, para no pisar el guardado.

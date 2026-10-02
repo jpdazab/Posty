@@ -63,7 +63,12 @@ export function weekMarkdown(week, data) {
   const head = ['---', `semana: ${week.id}`, `inicio: ${week.start}`, `tema: ${oneLine(data.tema)}`];
   if (oneLine(data.notas)) head.push(`notas: ${oneLine(data.notas)}`);
   head.push('---', '');
-  const posts = (data.posts || []).map((p) => {
+  return `${head.join('\n')}\n${postsMarkdown(week, data.posts).join('\n')}`;
+}
+
+// Un bloque "## Título" por post, en el formato de PROPUESTAS.md.
+export function postsMarkdown(week, list) {
+  return (list || []).map((p) => {
     const meta = [
       `## ${oneLine(p.titulo) || 'Propuesta'}`,
       `dia: ${week.days.includes(p.dia) ? p.dia : week.days[0]}`,
@@ -77,7 +82,6 @@ export function weekMarkdown(week, data) {
     if (tags.length) meta.push(`hashtags: ${tags.join(' ')}`);
     return `${meta.join('\n')}\n\n${safeText(p.texto)}\n`;
   });
-  return `${head.join('\n')}\n${posts.join('\n')}`;
 }
 
 // { which: 'current' | 'next', today: 'AAAA-MM-DD', settings, extra } → { week, source, posts }
