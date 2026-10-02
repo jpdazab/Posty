@@ -277,6 +277,28 @@ export async function verifyEmailCode(email, code) {
   }
 }
 
+// Entra con email y contraseña (no depende de que lleguen los emails).
+export async function signInWithPassword(email, password) {
+  const { data, error } = await supabaseClient().auth.signInWithPassword({ email, password });
+  if (error || !data.session) {
+    const text = `${error?.code || ''} ${error?.message || ''}`;
+    if (/invalid.*credentials|invalid_credentials/i.test(text)) throw new Error('Email o contraseña incorrectos. Si nunca has puesto contraseña, entra con el código del email o pídesela a quien administra Posty.');
+    if (/not.*confirmed/i.test(text)) throw new Error('Tu cuenta aún no está confirmada. Pide a quien administra Posty que la confirme.');
+    if (/rate limit|too many/i.test(text)) throw new Error('Demasiados intentos. Espera un minuto y vuelve a probar.');
+    throw new Error(error?.message || 'No se pudo entrar. Inténtalo de nuevo.');
+  }
+}
+
+// Pone o cambia la contraseña de la cuenta con la sesión abierta.
+export async function setPassword(password) {
+  const { error } = await supabaseClient().auth.updateUser({ password });
+  if (error) {
+    if (/weak|short|at least/i.test(error.message)) throw new Error('La contraseña es demasiado débil: usa al menos 8 caracteres, mezclando letras y números.');
+    if (/same/i.test(error.message)) throw new Error('Es la misma contraseña que ya tenías.');
+    throw new Error(error.message);
+  }
+}
+
 // Avisa cuando se inicia sesión (también si el enlace se abrió en otra pestaña del mismo navegador).
 export function onSignedIn(callback) {
   supabaseClient().auth.onAuthStateChange((event, session) => {

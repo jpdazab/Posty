@@ -2,7 +2,7 @@
 // y subida manual de semanas de propuestas (Markdown + imágenes).
 
 import { $, esc, toast, copy } from './ui.js';
-import { getBackend } from './backend.js';
+import { getBackend, setPassword } from './backend.js';
 import { parseWeek } from './parser.js';
 import { reloadWeeks } from './main.js';
 
@@ -40,6 +40,16 @@ function renderCloud() {
       <h2>Tu cuenta</h2>
       <p><strong>${esc(backend.user.email)}</strong></p>
       <div class="actions start"><button class="btn ghost" data-account-action="sign-out">Cerrar sesión</button></div>
+    </section>
+
+    <section class="ed-group account-card">
+      <h2>Contraseña</h2>
+      <p class="muted">Con una contraseña puedes entrar sin esperar el código por email.</p>
+      <form class="password-form" id="password-form" novalidate>
+        <label class="field">Nueva contraseña<input type="password" id="new-password" autocomplete="new-password" minlength="8" required /></label>
+        <label class="field">Repítela<input type="password" id="new-password-2" autocomplete="new-password" minlength="8" required /></label>
+        <div class="actions start"><button class="btn primary" type="submit">Guardar contraseña</button></div>
+      </form>
     </section>
 
     <section class="ed-group account-card">
@@ -157,6 +167,24 @@ export function initAccountPage() {
     if (!btn) return;
     e.preventDefault();
     handle(btn);
+  });
+  root.addEventListener('submit', async (e) => {
+    if (e.target.id !== 'password-form') return;
+    e.preventDefault();
+    const a = $('#new-password').value;
+    const b = $('#new-password-2').value;
+    if (a.length < 8) return toast('Usa al menos 8 caracteres.');
+    if (a !== b) return toast('Las dos contraseñas no coinciden.');
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+      await setPassword(a);
+      e.target.reset();
+      toast('Contraseña guardada. Ya puedes entrar con ella ✓');
+    } catch (err) {
+      toast(err.message);
+    }
+    btn.disabled = false;
   });
   root.addEventListener('change', async (e) => {
     if (e.target.dataset.weekUpload === undefined || !e.target.files.length) return;

@@ -701,3 +701,8 @@ body.wizard-open { overflow: hidden; }
   .te-blocks { grid-template-columns: repeat(4, 1fr); }
   .te-center { order: -1; }
 }
+.login-methods { margin: 0; }
+.password-field { position: relative; display: block; }
+.password-field input { width: 100%; padding-right: 76px; }
+.password-field .link { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.85rem; }
+.password-form { display: flex; flex-direction: column; gap: 10px; max-width: 360px; }

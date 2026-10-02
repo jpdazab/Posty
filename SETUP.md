@@ -79,6 +79,25 @@ con el enlace o con el código del email.
 **Si el enlace abre una página que no carga (por ejemplo `localhost:3000`)**: la *Site URL* y las
 *Redirect URLs* del paso 2.3 no tienen la dirección de Vercel. Mientras tanto, el código del email funciona igual.
 
+### Entrar con contraseña (si los emails no llegan)
+
+Posty también deja entrar con **email y contraseña** (pestaña *Contraseña* en la pantalla de acceso).
+Cada persona puede ponerse una en **Cuenta → Contraseña** después de entrar. Si alguien no puede
+entrar porque no le llega el código, dale una contraseña desde Supabase:
+
+- **Persona nueva**: *Authentication → Users → Add user → Create new user*, con email, contraseña y
+  *Auto Confirm User* marcado (no envía ningún email).
+- **Persona que ya existe**: en *SQL Editor*, cambia el email y la contraseña y pulsa *Run*:
+
+  ```sql
+  update auth.users
+  set encrypted_password = extensions.crypt('una-contraseña-segura', extensions.gen_salt('bf')),
+      email_confirmed_at = coalesce(email_confirmed_at, now())
+  where email = 'persona@ejemplo.com';
+  ```
+
+  Pásale la contraseña por un canal privado y que la cambie en *Cuenta → Contraseña*.
+
 Para quitar el acceso a alguien: **Authentication → Users → ⋯ → Delete user** (borra también sus datos).
 
 ## 6. Conectar la rutina semanal de cada persona
