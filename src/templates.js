@@ -3,6 +3,7 @@
 // Cada plantilla integrada es un post de ejemplo; "Usar" crea un post nuevo a partir de él.
 
 import { getKit, getCustomTemplate, CUSTOM_SIZES } from './kit.js';
+import { textLayers } from './layer-style.js';
 
 const visual = (kind, extra = {}) => ({ kind, items: [], left: '', overlap: '', right: '', src: '', alt: '', ...extra });
 
@@ -127,7 +128,7 @@ export function customPost(id) {
     title: tpl.name,
     text: '',
     hashtags: [],
-    fields: Object.fromEntries(tpl.layers.map((l) => [l.id, l.sample || ''])),
+    fields: Object.fromEntries(textLayers(tpl).map((l) => [l.id, l.sample || ''])),
   };
 }
 

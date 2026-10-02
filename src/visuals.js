@@ -7,6 +7,7 @@ import { flushSync } from 'react-dom';
 import { React, Jpdazab as J, lockupUrl } from './ds/index.js';
 import { getKit, getCustomTemplate } from './kit.js';
 import { cachedAssetUrl } from './assets-db.js';
+import { layerStyle } from './layer-style.js';
 import { customSize } from './templates.js';
 
 const h = React.createElement;
@@ -175,20 +176,14 @@ function CustomTemplate({ post }) {
     },
     tpl.overlay && h('div', { key: '__overlay', className: 'ds-overlay', style: { backgroundColor: tpl.overlay.color, opacity: tpl.overlay.opacity } }),
     logo && h('img', { key: '__logo', className: 'ds-layer ds-logo', src: logo, alt: 'Logo', style: { left: tpl.logo.x, top: tpl.logo.y, height: tpl.logo.h } }),
-    tpl.layers.map((l) =>
-      h(
-        'div',
-        {
-          key: l.id,
-          className: 'ds-layer',
-          style: {
-            left: l.x, top: l.y, width: l.w, fontSize: l.size, color: l.color, fontWeight: l.weight, textAlign: l.align,
-            lineHeight: l.lineHeight || 1.2, fontFamily: `"${l.font}", var(--font-sans)`,
-          },
-        },
-        post.fields?.[l.id] ?? l.sample ?? '',
-      ),
-    ),
+    tpl.layers.map((l) => {
+      if (l.kind === 'shape') return h('div', { key: l.id, className: 'ds-layer', style: layerStyle(l) });
+      if (l.kind === 'image') {
+        const src = cachedAssetUrl(l.assetId);
+        return src ? h('img', { key: l.id, className: 'ds-layer', src, alt: l.alt || '', style: layerStyle(l) }) : null;
+      }
+      return h('div', { key: l.id, className: 'ds-layer', style: layerStyle(l) }, post.fields?.[l.id] ?? l.sample ?? '');
+    }),
   );
 }
 

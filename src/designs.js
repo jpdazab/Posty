@@ -24,11 +24,10 @@ import {
   restartSetup,
   exportKit,
   importKit,
-  setDraftTemplate,
-  DRAFT_ID,
   setTempTemplates,
 } from './kit.js';
 import { startFromTemplate, editTemplate } from './create.js';
+import { mountTemplateEditor } from './template-editor.js';
 import { contentFromText, contentFromPage, designsFrom } from './layouts.js';
 
 const MAX_PDF_PAGES = 10;
@@ -214,90 +213,36 @@ function renderTemplateList(kit) {
     </div>`;
 }
 
-// ---------- Editor de plantilla propia ----------
+// ---------- Editor de plantilla propia (visual, ver template-editor.js) ----------
 
-function num(label, path, value, { min = 0, max = 4000, step = 1 } = {}) {
-  return `<label class="ed-field"><span>${esc(label)}</span><input type="number" data-tpl="${path}" value="${esc(value)}" min="${min}" max="${max}" step="${step}" /></label>`;
+let editor = null;
+
+function mountEditor(root) {
+  editor?.destroy();
+  editor = null;
+  const host = root.querySelector('#tpl-editor-root');
+  if (!host || !ui.draft) return;
+  editor = mountTemplateEditor(host, ui.draft, {
+    onSave: (tpl) => saveDraft(tpl),
+    onCancel: () => {
+      ui.draft = null;
+      renderDesigns();
+    },
+  });
 }
 
-function fontSelect(path, value) {
-  return `<label class="ed-field"><span>Tipografía</span><select data-tpl="${path}">${allFontFamilies()
-    .map((f) => `<option ${f === value ? 'selected' : ''}>${esc(f)}</option>`)
-    .join('')}</select></label>`;
-}
-
-function renderCustomEditor() {
-  const t = ui.draft;
-  return `
-    <article class="post gen-editing">
-      <div class="edit-bar">
-        <button class="btn ghost small" data-design-action="cancel-custom">← Volver sin guardar</button>
-        <strong>${esc(t.name || 'Plantilla')}</strong>
-        <button class="btn primary small" data-design-action="save-custom">Guardar plantilla</button>
-      </div>
-      <div class="edit-layout">
-        <div class="editor-panel">
-          <fieldset class="ed-group">
-            <legend>Plantilla</legend>
-            <label class="ed-field"><span>Nombre</span><input type="text" data-tpl="name" value="${esc(t.name)}" /></label>
-            <label class="ed-field"><span>Tamaño</span><select data-tpl="size">${t.size === 'custom' ? `<option value="custom" selected>${esc(customSize(t).label)}</option>` : ''}${Object.entries(CUSTOM_SIZES)
-              .map(([k, v]) => `<option value="${k}" ${t.size === k ? 'selected' : ''}>${esc(v.label)}</option>`)
-              .join('')}</select></label>
-            <label class="ed-field"><span>Color de fondo</span><input type="color" data-tpl="background" value="${esc(t.background)}" /></label>
-            <label class="ed-field"><span>Imagen de fondo</span>
-              <input type="file" accept="image/*" data-tpl-bg />
-              <small class="muted">${t.bgAssetId ? 'Imagen cargada. Se ajusta para cubrir todo el tamaño.' : 'Opcional. PNG o JPG del tamaño elegido.'}</small>
-            </label>
-            ${
-              t.bgAssetId
-                ? `<label class="check"><input type="checkbox" data-tpl-overlay ${t.overlay ? 'checked' : ''} /> Oscurecer o teñir la imagen</label>
-                   ${t.overlay ? `<div class="ed-row"><label class="ed-field"><span>Color</span><input type="color" data-tpl="overlay.color" value="${esc(t.overlay.color)}" /></label>${num('Opacidad (0 a 0,9)', 'overlay.opacity', t.overlay.opacity, { min: 0, max: 0.9, step: 0.05 })}</div>` : ''}
-                   <button class="btn ghost small" data-design-action="remove-bg">Quitar imagen de fondo</button>`
-                : ''
-            }
-          </fieldset>
-          <fieldset class="ed-group">
-            <legend>Logo</legend>
-            ${
-              getKit().theme.logoAssetId
-                ? `<label class="check"><input type="checkbox" data-tpl-logo ${t.logo?.show ? 'checked' : ''} /> Mostrar mi logo</label>
-                   ${t.logo?.show ? `<div class="ed-row">${num('X', 'logo.x', t.logo.x)}${num('Y', 'logo.y', t.logo.y)}${num('Alto', 'logo.h', t.logo.h, { min: 10, max: 1000 })}</div>` : ''}`
-                : '<p class="muted small">Sube tu logo en <strong>Colores y tipografía</strong> para poder usarlo en tus plantillas.</p>'
-            }
-          </fieldset>
-          ${t.layers
-            .map(
-              (l, i) => `
-            <fieldset class="ed-group">
-              <legend>Capa: ${esc(l.name)}</legend>
-              <div class="ed-item-head"><span class="muted small">Posición y tamaño en píxeles</span><button class="link danger" data-design-action="remove-layer" data-index="${i}">Quitar capa</button></div>
-              <label class="ed-field"><span>Nombre</span><input type="text" data-tpl="layers.${i}.name" value="${esc(l.name)}" /></label>
-              <label class="ed-field"><span>Texto de ejemplo</span><textarea data-tpl="layers.${i}.sample" rows="2">${esc(l.sample)}</textarea></label>
-              <div class="ed-row">
-                ${num('X', `layers.${i}.x`, l.x)}${num('Y', `layers.${i}.y`, l.y)}${num('Ancho', `layers.${i}.w`, l.w, { min: 20 })}
-              </div>
-              <div class="ed-row">
-                ${num('Tamaño', `layers.${i}.size`, l.size, { min: 8, max: 400 })}
-                ${num('Interlineado', `layers.${i}.lineHeight`, l.lineHeight, { min: 0.6, max: 3, step: 0.05 })}
-                <label class="ed-field"><span>Color</span><input type="color" data-tpl="layers.${i}.color" value="${esc(l.color)}" /></label>
-              </div>
-              <div class="ed-row">
-                ${fontSelect(`layers.${i}.font`, l.font)}
-                <label class="ed-field"><span>Peso</span><select data-tpl="layers.${i}.weight">${[400, 500, 600, 700]
-                  .map((w) => `<option ${Number(l.weight) === w ? 'selected' : ''}>${w}</option>`)
-                  .join('')}</select></label>
-                <label class="ed-field"><span>Alineación</span><select data-tpl="layers.${i}.align">${['left', 'center', 'right']
-                  .map((a) => `<option value="${a}" ${l.align === a ? 'selected' : ''}>${{ left: 'Izquierda', center: 'Centro', right: 'Derecha' }[a]}</option>`)
-                  .join('')}</select></label>
-              </div>
-            </fieldset>`,
-            )
-            .join('')}
-          <button class="btn ghost small" data-design-action="add-layer">+ Añadir capa de texto</button>
-        </div>
-        <div class="edit-preview"><div id="tpl-draft-preview"></div></div>
-      </div>
-    </article>`;
+async function saveDraft(tpl) {
+  ui.draft = null;
+  if (tpl.id.startsWith('__gen_')) {
+    // Propuesta de Generar diseños: se guarda con id propio.
+    ui.gen.results = ui.gen.results.map((t) => (t.id === tpl.id ? tpl : t));
+    setTempTemplates(ui.gen.results);
+    await persistGenerated(tpl.id);
+  } else {
+    saveCustomTemplate(tpl);
+  }
+  toast('Plantilla guardada');
+  renderDesigns();
 }
 
 // ---------- Marca: colores, tipografía, firma ----------
@@ -425,16 +370,6 @@ function mountPreviews(root) {
     el.innerHTML = frameHtml(post);
     mountPages(el, post);
   }
-  const draft = root.querySelector('#tpl-draft-preview');
-  if (draft && ui.draft) renderDraft(draft);
-}
-
-// La plantilla en edición aún no está guardada: se dibuja como borrador temporal.
-function renderDraft(container) {
-  setDraftTemplate(ui.draft);
-  const post = normalizePost({ format: 'custom', templateId: DRAFT_ID, fields: {} });
-  container.innerHTML = frameHtml(post);
-  mountPages(container, post);
 }
 
 export function renderDesigns() {
@@ -453,14 +388,19 @@ export function renderDesigns() {
     </header>
     ${
       ui.draft
-        ? renderCustomEditor()
+        ? '<div id="tpl-editor-root"></div>'
         : `<div class="mode-switch" role="tablist">
              <button role="tab" class="chip ${ui.tab === 'plantillas' ? 'active' : ''}" aria-selected="${ui.tab === 'plantillas'}" data-design-action="tab" data-tab="plantillas">Plantillas</button>
              <button role="tab" class="chip ${ui.tab === 'marca' ? 'active' : ''}" aria-selected="${ui.tab === 'marca'}" data-design-action="tab" data-tab="marca">Colores y tipografía</button>
            </div>
            ${ui.tab === 'plantillas' ? renderTemplates() : renderBrand()}`
     }`;
-  mountPreviews(root);
+  if (ui.draft) mountEditor(root);
+  else {
+    editor?.destroy();
+    editor = null;
+    mountPreviews(root);
+  }
 }
 
 let previewTimer;
@@ -617,11 +557,6 @@ function postTextFromSource() {
 
 // ---------- Acciones ----------
 
-function setPath(obj, path, value) {
-  const keys = path.split('.');
-  const last = keys.pop();
-  keys.reduce((o, k) => o[k], obj)[last] = value;
-}
 
 async function handle(btn) {
   const { designAction: action, id } = btn.dataset;
@@ -717,48 +652,6 @@ async function handle(btn) {
       renderDesigns();
       break;
     }
-    case 'cancel-custom':
-      ui.draft = null;
-      setDraftTemplate(null);
-      renderDesigns();
-      break;
-    case 'save-custom': {
-      const draft = ui.draft;
-      if (draft.id.startsWith('__gen_')) {
-        const genId = draft.id;
-        ui.gen.results = ui.gen.results.map((t) => (t.id === genId ? draft : t));
-        setTempTemplates(ui.gen.results);
-        ui.draft = null;
-        setDraftTemplate(null);
-        await persistGenerated(genId);
-        toast('Plantilla guardada');
-        renderDesigns();
-        break;
-      }
-      ui.draft = null;
-      setDraftTemplate(null);
-      saveCustomTemplate(draft);
-      toast('Plantilla guardada');
-      renderDesigns();
-      break;
-    }
-    case 'add-layer':
-      {
-        // La capa nueva va debajo de la última, sin salirse del lienzo.
-        const { h: height } = customSize(ui.draft);
-        const lastY = Math.max(0, ...ui.draft.layers.map((l) => l.y + l.size * (l.lineHeight || 1.2) * 2));
-        ui.draft.layers.push({ ...newCustomTemplate().layers[1], id: `capa-${Date.now().toString(36)}`, name: `Capa ${ui.draft.layers.length + 1}`, y: Math.min(Math.round(lastY + 40), height - 120) });
-      }
-      renderDesigns();
-      break;
-    case 'remove-layer':
-      ui.draft.layers.splice(Number(btn.dataset.index), 1);
-      renderDesigns();
-      break;
-    case 'remove-bg':
-      ui.draft.bgAssetId = null;
-      renderDesigns();
-      break;
     case 'remove-font':
       await removeFont(id);
       renderDesigns();
@@ -810,16 +703,6 @@ async function handleChange(e) {
       if (key === 'size' || key === 'siteColors') renderDesigns();
       return;
     }
-    if (el.dataset.tplOverlay !== undefined) {
-      ui.draft.overlay = el.checked ? { color: '#000000', opacity: 0.45, ...(ui.draft.overlay || {}) } : null;
-      renderDesigns();
-      return;
-    }
-    if (el.dataset.tplLogo !== undefined) {
-      ui.draft.logo = { x: 80, y: customSize(ui.draft).h - 160, h: 80, ...ui.draft.logo, show: el.checked };
-      renderDesigns();
-      return;
-    }
     if (el.dataset.fontUpload !== undefined && el.files[0]) {
       const family = await addFont(el.files[0]);
       toast(`Tipografía "${family}" añadida`);
@@ -828,16 +711,6 @@ async function handleChange(e) {
       await setLogo(el.files[0]);
       await assetUrl(getKit().theme.logoAssetId);
       toast('Logo actualizado');
-      renderDesigns();
-    } else if (el.dataset.tplBg !== undefined && el.files[0]) {
-      const old = ui.draft.bgAssetId;
-      ui.draft.bgAssetId = await storeImage(el.files[0]);
-      await assetUrl(ui.draft.bgAssetId);
-      // Ajusta el tamaño al de la imagen si coincide con uno de los formatos.
-      const img = await createImageBitmap(el.files[0]).catch(() => null);
-      const match = img && Object.entries(CUSTOM_SIZES).find(([, s]) => Math.abs(s.w / s.h - img.width / img.height) < 0.02);
-      if (match) ui.draft.size = match[0];
-      if (old && !getKit().customTemplates.some((t) => t.bgAssetId === old)) deleteAsset(old).catch(() => {});
       renderDesigns();
     } else if (el.dataset.kitImport !== undefined && el.files[0]) {
       await importKit(await el.files[0].text());
@@ -848,9 +721,6 @@ async function handleChange(e) {
         if (el.value) k.theme.fonts[el.dataset.fontRole] = el.value;
         else delete k.theme.fonts[el.dataset.fontRole];
       });
-    } else if (el.tagName === 'SELECT' && el.dataset.tpl) {
-      setPath(ui.draft, el.dataset.tpl, el.value);
-      renderDesigns();
     }
   } catch (err) {
     console.error(err);
@@ -872,15 +742,6 @@ function handleInput(e) {
   } else if (el.dataset.themeText) {
     updateKit((k) => (k.theme[el.dataset.themeText] = el.value));
     refreshPreviews();
-  } else if (el.dataset.tpl && el.tagName !== 'SELECT' && el.type !== 'file') {
-    const numeric = el.type === 'number';
-    setPath(ui.draft, el.dataset.tpl, numeric ? Number(el.value) : el.value);
-    if (el.dataset.tpl === 'name') $('#designs-root .edit-bar strong').textContent = el.value || 'Plantilla';
-    const container = $('#tpl-draft-preview');
-    if (container) {
-      clearTimeout(previewTimer);
-      previewTimer = setTimeout(() => renderDraft(container), 80);
-    }
   }
 }
 

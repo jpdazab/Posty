@@ -9,6 +9,7 @@ import { $, esc, toast, copy, linkedinIcon } from './ui.js';
 import { postFromText, analyzeText, clip } from './autolayout.js';
 import { builtinPost, customPost, BUILTIN_TEMPLATES } from './templates.js';
 import { getKit, getCustomTemplate, setTemplateContent } from './kit.js';
+import { textLayers } from './layer-style.js';
 import { getBackend } from './backend.js';
 import {
   normalizePost,
@@ -145,7 +146,7 @@ function blankPost(format, templateId) {
 function customFromText(text, templateId) {
   const post = customPost(templateId);
   const a = analyzeText(text);
-  const [first, second] = getCustomTemplate(templateId).layers;
+  const [first, second] = textLayers(getCustomTemplate(templateId));
   if (first) post.fields[first.id] = clip(a.hook, 90);
   if (second) post.fields[second.id] = clip(a.restSentences.slice(0, 2).join(' '), 200);
   return normalizePost({ ...post, ...newMeta(), text: a.text, hashtags: a.hashtags, title: clip(a.hook, 50) });
@@ -155,7 +156,7 @@ function customFromText(text, templateId) {
 function customFromGenerated(data, templateId, prompt) {
   const post = customPost(templateId);
   const a = analyzeText(data.text || '');
-  const [first, second] = getCustomTemplate(templateId).layers;
+  const [first, second] = textLayers(getCustomTemplate(templateId));
   if (first) post.fields[first.id] = data.card?.headline || clip(a.hook, 90);
   if (second) post.fields[second.id] = data.card?.lead || clip(a.restSentences.slice(0, 2).join(' '), 200);
   return normalizePost({ ...post, ...newMeta({ prompt }), text: data.text || '', hashtags: data.hashtags || [], title: data.title || clip(a.hook, 50) });
@@ -366,7 +367,7 @@ function renderGraphicEditor(post) {
     return `
       <fieldset class="ed-group">
         <legend>${esc(tpl.name)}</legend>
-        ${tpl.layers
+        ${textLayers(tpl)
           .map(
             (l) => `<label class="ed-field"><span>${esc(l.name)}</span><textarea data-field="fields.${esc(l.id)}" rows="2">${esc(post.fields[l.id] ?? '')}</textarea></label>`,
           )

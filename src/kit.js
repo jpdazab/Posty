@@ -308,7 +308,7 @@ function assetIds() {
   return [
     ...kit.fonts.map((f) => f.assetId),
     kit.theme.logoAssetId,
-    ...kit.customTemplates.map((t) => t.bgAssetId),
+    ...kit.customTemplates.flatMap((t) => [t.bgAssetId, ...(t.layers || []).map((l) => l.assetId)]),
   ].filter(Boolean);
 }
 

@@ -38,8 +38,13 @@ Páginas del menú lateral:
     se convierte en una plantilla con la página de fondo sin sus textos y los textos como capas editables
     (posición, tamaño, color, alineación, peso y tipografía si la tienes subida). Se hace en el navegador con
     pdf.js; el texto girado y los PDF escaneados se quedan en el fondo.
-  - **Mis plantillas**: plantillas propias con fondo (color o imagen, por ejemplo exportada de Figma)
-    y capas de texto con posición, tamaño, color, tipografía, peso y alineación.
+  - **Mis plantillas**, con un **editor visual estilo newsletter**: bloques que se arrastran al lienzo
+    (título, subtítulo, párrafo, lista, cita, etiqueta, cifra, firma, botón, separador, bloque de color,
+    círculo, imagen y logo); en el lienzo cada elemento se selecciona, se mueve con guías de alineación,
+    se redimensiona con tiradores y el texto se escribe con doble clic. Panel de capas con orden por
+    arrastre (arriba = delante), propiedades del elemento o del lienzo (fondo de color o imagen, capa de
+    color, logo), deshacer/rehacer y atajos (Supr, flechas, ⌘/Ctrl+D). Al crear un post, el primer texto
+    recibe el titular y el segundo el texto.
   - **Colores y tipografía**: los colores, tipografías, firma y logo de la marca (los mismos controles
     del asistente). Las plantillas nuevas empiezan con ellos.
   - **Exportar / importar kit**: un JSON con todo lo anterior (incluidos los archivos) para llevarlo
