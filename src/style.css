@@ -796,3 +796,21 @@ body:has(#create-root:not([hidden]) .post-modal) { overflow: hidden; }
 }
 
 .pm-more { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+/* Colores de marca a un clic, temas de fondo (degradados y texturas) */
+.te-color input[type="color"] { width: 100%; }
+.te-swatches { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.te-swatch {
+  width: 20px; height: 20px; padding: 0; border-radius: 50%; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+}
+.te-swatch:hover { transform: scale(1.12); }
+.te-swatch.active { outline: 2px solid var(--brand); outline-offset: 2px; }
+.te-swatch:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.te-themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; margin-bottom: 4px; }
+.te-theme {
+  aspect-ratio: 4 / 5; padding: 0; border-radius: 6px; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
+}
+.te-theme:hover { outline: 2px solid var(--brand); outline-offset: 1px; }
+.te-theme:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }

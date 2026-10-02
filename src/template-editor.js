@@ -13,6 +13,7 @@ import { customSize } from './templates.js';
 import { layerCss, isText } from './layer-style.js';
 import { contrast } from './layouts.js';
 import { chartSvg, CHART_TYPES, SAMPLE_DATA, categoricalPalette, mix } from './charts.js';
+import { fillCss, fillBase, fillThemes, readableText, GRADIENT_KINDS, PATTERNS } from './fills.js';
 
 const LOGO = '__logo';
 const WEIGHTS = [300, 400, 500, 600, 700, 800, 900];
@@ -211,7 +212,7 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
     const bg = cachedAssetUrl(t.bgAssetId);
     const logo = t.logo?.show ? cachedAssetUrl(getKit().theme.logoAssetId) : null;
     q('.te-stage').innerHTML = `
-      <div class="te-bg" style="background-color:${esc(t.background || '#ffffff')};${bg ? `background-image:url('${esc(bg)}')` : ''}"></div>
+      <div class="te-bg" style="${esc(bg ? `background-color:${t.background || '#ffffff'};background-image:url('${bg}')` : fillCss(t.background, t.fill))}"></div>
       ${t.overlay ? `<div class="te-bg" style="background:${esc(t.overlay.color)};opacity:${Number(t.overlay.opacity) || 0}"></div>` : ''}
       ${logo ? `<img class="te-el${ed.sel === LOGO ? ' is-selected' : ''}" data-id="${LOGO}" src="${esc(logo)}" alt="Logo" draggable="false" style="position:absolute;left:${t.logo.x}px;top:${t.logo.y}px;height:${t.logo.h}px;width:auto" />` : ''}
       ${t.layers.map(elementHtml).join('')}
@@ -266,7 +267,19 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
   const field = (label, html, cls = '') => `<label class="ed-field ${cls}"><span>${esc(label)}</span>${html}</label>`;
   const num = (label, prop, value, { min = 0, max = 5000, step = 1 } = {}) =>
     field(label, `<input type="number" data-te-prop="${prop}" value="${esc(value ?? '')}" min="${min}" max="${max}" step="${step}" />`);
-  const color = (label, prop, value) => field(label, `<input type="color" data-te-prop="${prop}" value="${esc(value || '#000000')}" />`);
+  // Selector de color con los colores de la marca a un clic.
+  const swatches = () => {
+    const { primary, secondary, background, text } = getKit().brand.colors;
+    return [...new Set([primary, secondary, background, text, '#ffffff', '#000000'].filter(Boolean).map((c) => c.toLowerCase()))];
+  };
+  const picker = (label, attr, path, value) => `
+    <div class="ed-field te-color"><span>${esc(label)}</span>
+      <input type="color" ${attr}="${path}" value="${esc(value || '#000000')}" aria-label="${esc(label)}" />
+      <span class="te-swatches">${swatches().map((c) => `<button type="button" class="te-swatch${c === String(value).toLowerCase() ? ' active' : ''}" data-te="swatch" data-color="${c}" style="background:${c}" title="${c}" aria-label="Usar ${c}"></button>`).join('')}</span>
+    </div>`;
+  const color = (label, prop, value) => picker(label, 'data-te-prop', prop, value);
+  const tplColor = (label, path, value) => picker(label, 'data-te-tpl', path, value);
+  const range = (label, attr, path, value, min, max, step = 1) => field(label, `<input type="range" ${attr}="${path}" min="${min}" max="${max}" step="${step}" value="${esc(value)}" />`);
   const check = (label, prop, on) => `<label class="check"><input type="checkbox" data-te-prop="${prop}" ${on ? 'checked' : ''} /> ${esc(label)}</label>`;
 
   function canvasProps() {
@@ -277,7 +290,7 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
       ${field('Tamaño', `<select data-te-tpl="size">${t.size === 'custom' ? `<option value="custom" selected>${esc(customSize(t).label)}</option>` : ''}${Object.entries(CUSTOM_SIZES)
         .map(([k, v]) => `<option value="${k}" ${t.size === k ? 'selected' : ''}>${esc(v.label)}</option>`)
         .join('')}</select>`)}
-      ${field('Color de fondo', `<input type="color" data-te-tpl="background" value="${esc(t.background || '#ffffff')}" />`)}
+      ${t.bgAssetId ? '' : backgroundProps(t)}
       <div class="ed-field"><span>Imagen de fondo</span>
         <label class="btn ghost small">${t.bgAssetId ? 'Cambiar imagen' : 'Subir imagen'}<input type="file" accept="image/*" data-te-file="bg" hidden /></label>
         ${t.bgAssetId ? '<button class="link danger" data-te="remove-bg">Quitar imagen</button>' : '<small class="muted">Por ejemplo, un diseño exportado de Figma o Canva.</small>'}
@@ -290,6 +303,61 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
       }
       ${hasLogo ? `<label class="check"><input type="checkbox" data-te-tpl="logo.show" ${t.logo?.show ? 'checked' : ''} /> Mostrar mi logo</label>` : '<button class="btn ghost small" data-te="upload-logo">Subir mi logo</button>'}
       <p class="muted small">Selecciona un elemento del lienzo para cambiarlo. Al crear un post, el primer texto recibe el titular y el segundo el texto (mira las etiquetas en Capas).</p>`;
+  }
+
+  function backgroundProps(t) {
+    const mode = !t.fill?.kind ? 'solid' : t.fill.kind === 'pattern' ? 'pattern' : 'gradient';
+    const f = t.fill || {};
+    const themes = fillThemes(getKit().brand.colors);
+    return `
+      <div class="ed-field"><span>Temas</span>
+        <div class="te-themes">${themes.map((th, i) => `<button type="button" class="te-theme" data-te="theme" data-index="${i}" title="${esc(th.name)}" aria-label="Tema ${esc(th.name)}" style="${esc(fillCss(th.background, th.fill, 0.18))}"></button>`).join('')}</div>
+        <small class="muted">Hechos con tus colores de marca. Si el texto deja de leerse, se ajusta su color.</small>
+      </div>
+      <div class="ed-field"><span>Fondo</span>
+        <div class="te-align" role="group" aria-label="Tipo de fondo">${Object.entries({ solid: 'Color', gradient: 'Degradado', pattern: 'Textura' })
+          .map(([k, v]) => `<button type="button" class="chip ${mode === k ? 'active' : ''}" data-te="fill-mode" data-value="${k}">${v}</button>`)
+          .join('')}</div>
+      </div>
+      ${
+        mode === 'solid'
+          ? tplColor('Color de fondo', 'background', t.background || '#ffffff')
+          : mode === 'gradient'
+            ? `${field('Estilo', `<select data-te-tpl="fill.kind">${Object.entries(GRADIENT_KINDS).map(([k, v]) => `<option value="${k}" ${f.kind === k ? 'selected' : ''}>${v}</option>`).join('')}</select>`)}
+               ${tplColor('Color 1', 'fill.from', f.from)}
+               ${tplColor('Color 2', 'fill.to', f.to)}
+               ${f.kind === 'aurora' ? tplColor('Color de base', 'background', t.background) : ''}
+               ${f.kind === 'linear' ? range('Ángulo', 'data-te-tpl', 'fill.angle', f.angle ?? 135, 0, 360, 5) : ''}`
+            : `${field('Textura', `<select data-te-tpl="fill.pattern">${Object.entries(PATTERNS).map(([k, v]) => `<option value="${k}" ${f.pattern === k ? 'selected' : ''}>${v}</option>`).join('')}</select>`)}
+               ${tplColor('Color de base', 'background', t.background)}
+               ${tplColor('Color de la textura', 'fill.color', f.color)}
+               ${range('Tamaño', 'data-te-tpl', 'fill.size', f.size ?? 48, 12, 240, 4)}`
+      }`;
+  }
+
+  // Al elegir un tema, los textos que dejarían de leerse toman un color legible de la marca.
+  function applyTheme(th) {
+    const brand = getKit().brand.colors;
+    const base = fillBase(th.background, th.fill);
+    change(() => {
+      ed.tpl.background = th.background;
+      ed.tpl.fill = th.fill ? { ...th.fill } : null;
+      for (const l of ed.tpl.layers) {
+        if (isText(l) && !l.bg) l.color = readableText(l.color, base, brand);
+        if (l.kind === 'chart') l.text = readableText(l.text, base, brand);
+      }
+    });
+  }
+
+  function setFillMode(mode) {
+    const t = ed.tpl;
+    const { primary, secondary } = getKit().brand.colors;
+    const bg = t.background || '#ffffff';
+    change(() => {
+      if (mode === 'solid') t.fill = null;
+      else if (mode === 'gradient') t.fill = { kind: 'linear', angle: 135, from: t.fill?.from || primary, to: t.fill?.to || secondary };
+      else t.fill = { kind: 'pattern', pattern: 'dots', color: mix(bg, primary, 0.3), size: 48 };
+    });
   }
 
   function layerActions() {
@@ -333,7 +401,18 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
   function shapeProps(l) {
     return `
       ${field('Nombre', `<input type="text" data-te-prop="name" value="${esc(l.name || '')}" maxlength="40" />`)}
-      <div class="ed-row">${color('Color', 'color', l.color)}${num('Redondeo', 'radius', l.radius ?? 0, { max: 9999 })}</div>
+      <div class="ed-field"><span>Relleno</span>
+        <div class="te-align" role="group" aria-label="Relleno">
+          <button type="button" class="chip ${l.gradient ? '' : 'active'}" data-te="shape-fill" data-value="solid">Color</button>
+          <button type="button" class="chip ${l.gradient ? 'active' : ''}" data-te="shape-fill" data-value="gradient">Degradado</button>
+        </div>
+      </div>
+      ${
+        l.gradient
+          ? `${color('Color 1', 'gradient.from', l.gradient.from)}${color('Color 2', 'gradient.to', l.gradient.to)}${range('Ángulo', 'data-te-prop', 'gradient.angle', l.gradient.angle ?? 135, 0, 360, 5)}`
+          : color('Color', 'color', l.color)
+      }
+      ${num('Redondeo', 'radius', l.radius ?? 0, { max: 9999 })}
       ${position(l, true)}
       ${field('Opacidad', `<input type="range" min="0.05" max="1" step="0.05" data-te-prop="opacity" value="${esc(l.opacity ?? 1)}" />`)}`;
   }
@@ -715,7 +794,8 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
         if (path.startsWith('palette.')) {
           l.palette = [...(l.palette || [])];
           l.palette[Number(path.split('.')[1])] = v;
-        } else l[path] = v;
+        } else if (path.includes('.')) setPath(l, path, v);
+        else l[path] = v;
       }
       refreshElement(ed.sel);
       if (path === 'name' || path === 'sample') renderLayers();
@@ -822,6 +902,29 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
         return;
       case 'upload-logo':
         return pickLogo();
+      case 'swatch': {
+        // Igual que elegirlo en el selector: así pasa por el mismo camino (deshacer incluido).
+        const input = btn.closest('.te-color')?.querySelector('input[type=color]');
+        if (!input) return;
+        input.value = btn.dataset.color;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        return renderProps();
+      }
+      case 'theme':
+        applyTheme(fillThemes(getKit().brand.colors)[Number(btn.dataset.index)]);
+        return renderAll();
+      case 'fill-mode':
+        setFillMode(btn.dataset.value);
+        return renderAll();
+      case 'shape-fill': {
+        const l = layerById(ed.sel);
+        if (!l) return;
+        const { secondary } = getKit().brand.colors;
+        change(() => (l.gradient = btn.dataset.value === 'gradient' ? { from: l.color, to: l.color?.toLowerCase() === secondary?.toLowerCase() ? mix(l.color, '#ffffff', 0.4) : secondary, angle: 135 } : undefined));
+        refreshElement(l.id);
+        return renderProps();
+      }
       case 'remove-bg':
         change(() => {
           ed.tpl.bgAssetId = null;

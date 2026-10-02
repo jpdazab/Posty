@@ -23,7 +23,10 @@ export function postLayers(tpl) {
 export function layerStyle(l) {
   const base = { position: 'absolute', left: l.x, top: l.y, width: l.w, opacity: l.opacity ?? 1 };
   if (l.kind === 'shape') {
-    return { ...base, height: l.h, backgroundColor: l.color, borderRadius: l.radius || 0 };
+    const style = { ...base, height: l.h, backgroundColor: l.color, borderRadius: l.radius || 0 };
+    // Degradado opcional: { from, to, angle }.
+    if (l.gradient) style.backgroundImage = `linear-gradient(${Number(l.gradient.angle) || 0}deg, ${l.gradient.from}, ${l.gradient.to})`;
+    return style;
   }
   if (l.kind === 'chart') return { ...base, height: l.h };
   if (l.kind === 'image') {

@@ -14,6 +14,7 @@ import { CHART_TYPES } from './charts.js';
 import { generateAiImage, hasOpenAiKey, suggestPrompt } from './ai-image.js';
 import { getBackend } from './backend.js';
 import { closeCreate } from './main.js';
+import { fillCss } from './fills.js';
 import {
   normalizePost,
   emptyVisual,
@@ -293,7 +294,7 @@ function renderFormatQuestion() {
        ${getKit()
          .customTemplates.map(
            (t) => `<button class="format-option" data-create-action="format" data-format="custom" data-template="${esc(t.id)}">
-             <span class="format-thumb thumb-custom" aria-hidden="true"><i style="background:${esc(t.background)}"></i></span>
+             <span class="format-thumb thumb-custom" aria-hidden="true"><i style="${esc(fillCss(t.background, t.fill, 0.1))}"></i></span>
              <strong>${esc(t.name)}</strong>
              <span>Plantilla propia</span>
            </button>`,
