@@ -40,17 +40,27 @@ const VISUAL_LABELS = { none: 'Sin gráfico', stats: 'Cifras', bars: 'Barras', v
 const MODES = {
   ai: {
     label: 'Pedir a Claude',
+    desc: 'Cuéntale tu idea y Claude escribe el post y rellena el diseño.',
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M19 15v5M16.5 17.5h5M5 2.5v3M3.5 4h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     placeholder: 'Cuéntale a Claude de qué quieres hablar: una idea, una anécdota, una charla, un dato…',
     submit: 'Generar con Claude →',
     user: (s) => esc(s.prompt),
   },
   paste: {
     label: 'Pegar mi texto',
+    desc: 'Ya tienes el texto: Posty lo reparte en el diseño, sin IA.',
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 4V3h6v1M9 4v2h6V4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 11h7M8.5 14.5h7M8.5 18h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     placeholder: 'Pega aquí el texto de tu post. Posty usará la primera línea como titular, las listas y cifras para la gráfica y la pregunta final para cerrar.',
     submit: 'Crear diseño →',
     user: (s) => `<span class="muted small">${s.seedTitle ? `Propuesta del AI Digest · ${esc(s.seedTitle)}` : 'Texto pegado'}</span><br>${esc(s.prompt.length > 220 ? `${s.prompt.slice(0, 220)}…` : s.prompt)}`,
   },
-  manual: { label: 'Desde cero', submit: 'Elegir formato →', user: () => 'Quiero escribirlo desde cero' },
+  manual: {
+    label: 'Desde cero',
+    desc: 'Eliges la plantilla y escribes cada parte en el editor.',
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.5 6.5l4 4M14 20h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    submit: 'Elegir formato →',
+    user: () => 'Quiero escribirlo desde cero',
+  },
 };
 
 const SUGGESTIONS = [
@@ -60,7 +70,7 @@ const SUGGESTIONS = [
 ];
 
 const state = {
-  step: 'prompt', // prompt → format → loading → result | error
+  step: 'choose', // choose → prompt → format → loading → result | error (desde cero: choose → format)
   mode: 'ai', // ai | paste | manual
   prompt: '',
   format: null,
@@ -271,13 +281,31 @@ function bubble(role, content) {
   return `<div class="msg msg-${role}">${role === 'assistant' ? '<span class="msg-avatar" aria-hidden="true">✳</span>' : ''}<div class="msg-content">${content}</div></div>`;
 }
 
+// Primer paso: cómo se quiere crear el post.
+function renderChooser() {
+  return `
+    <h2 class="choose-title">¿Cómo quieres crear tu post?</h2>
+    <div class="mode-cards">
+      ${Object.entries(MODES)
+        .map(
+          ([key, m]) => `<button type="button" class="mode-card" data-create-action="choose" data-mode="${key}">
+            <span class="mode-icon">${m.icon}</span>
+            <strong>${esc(m.label)}</strong>
+            <span class="muted">${esc(m.desc)}</span>
+            <span class="mode-card-go">Empezar →</span>
+          </button>`,
+        )
+        .join('')}
+    </div>`;
+}
+
 function renderComposer() {
   const mode = MODES[state.mode];
   return `
-    <div class="mode-switch" role="tablist" aria-label="Cómo quieres crear el post">
-      ${Object.entries(MODES)
-        .map(([key, m]) => `<button role="tab" class="chip ${state.mode === key ? 'active' : ''}" aria-selected="${state.mode === key}" data-create-action="mode" data-mode="${key}">${m.label}</button>`)
-        .join('')}
+    <div class="composer-mode" data-mode="${state.mode}">
+      <span class="mode-icon small">${mode.icon}</span>
+      <strong>${esc(mode.label)}</strong>
+      <button type="button" class="link" data-create-action="change-mode">Cambiar</button>
     </div>
     <form class="composer" id="create-form">
       ${
@@ -664,6 +692,7 @@ function fitFullscreenFrames() {
 }
 
 function renderConversation() {
+  if (state.step === 'choose') return renderChooser();
   if (state.step === 'prompt') return renderComposer();
   const parts = [bubble('user', `<p>${MODES[state.mode].user(state)}</p>`)];
 
@@ -726,8 +755,8 @@ export function renderCreate() {
       <h1>Crear post</h1>
       <p class="muted">Pide un post a Claude, pega tu texto o empieza desde cero. La gráfica sale con tus plantillas, lista para LinkedIn.</p>
     </header>
-    <section class="conversation" aria-live="polite">${full ? renderComposer() : renderConversation()}</section>
-    ${state.step === 'prompt' && history.length ? `<p class="muted small create-posts-link">Tus posts guardados están en <a href="#/posts" data-create-action="go-posts">My posts →</a></p>` : ''}
+    <section class="conversation" aria-live="polite">${full ? renderChooser() : renderConversation()}</section>
+    ${state.step === 'choose' && history.length ? `<p class="muted small create-posts-link">Tus posts guardados están en <a href="#/posts" data-create-action="go-posts">My posts →</a></p>` : ''}
     ${full ? renderFullscreen(state.result) : ''}`;
   if (full) fitFullscreenFrames();
   mountPreview();
@@ -839,7 +868,7 @@ function closeFull() {
 }
 
 function resetToStart() {
-  Object.assign(state, { step: 'prompt', prompt: '', format: null, result: null, editing: false, snapshot: null, isNew: false, fullscreen: false, aiImage: null, seedTitle: '', publishHelp: false, returnTo: null });
+  Object.assign(state, { step: 'choose', prompt: '', format: null, result: null, editing: false, snapshot: null, isNew: false, fullscreen: false, aiImage: null, seedTitle: '', publishHelp: false, returnTo: null });
   renderCreate();
 }
 
@@ -849,6 +878,16 @@ async function handle(btn) {
   switch (action) {
     case 'mode':
       state.mode = btn.dataset.mode;
+      renderCreate();
+      break;
+    case 'choose':
+      state.mode = btn.dataset.mode;
+      // Desde cero no hay nada que escribir antes: se pasa directo a elegir la plantilla.
+      state.step = state.mode === 'manual' ? 'format' : 'prompt';
+      renderCreate();
+      break;
+    case 'change-mode':
+      state.step = 'choose';
       renderCreate();
       break;
     case 'suggest':
@@ -872,7 +911,7 @@ async function handle(btn) {
       location.hash = '#/disenos';
       break;
     case 'back':
-      state.step = 'prompt';
+      state.step = state.mode === 'manual' ? 'choose' : 'prompt';
       state.seedTitle = '';
       renderCreate();
       break;
@@ -964,8 +1003,8 @@ async function handle(btn) {
         resetToStart();
         location.hash = '#/disenos';
       } else if (state.isNew) {
-        // Nunca se guardó: volver al inicio sin dejar rastro.
-        state.step = 'prompt';
+        // Nunca se guardó: volver al paso anterior sin dejar rastro.
+        state.step = state.mode === 'manual' ? 'choose' : 'prompt';
         state.result = null;
         state.editing = false;
         state.fullscreen = false;
@@ -1162,6 +1201,9 @@ export function initCreatePage() {
     if (e.target.closest?.('input, textarea, select') || document.querySelector('.modal-backdrop')) return;
     // Primero se cierra el post abierto; con la pantalla de inicio a la vista, se cierra Crear post.
     if (state.fullscreen) closeFull();
-    else if (state.step === 'prompt') closeCreate();
+    else if (state.step === 'prompt') {
+      state.step = 'choose';
+      renderCreate();
+    } else if (state.step === 'choose') closeCreate();
   });
 }
