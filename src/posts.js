@@ -1,4 +1,4 @@
-// My posts: los posts creados en Crear post, en tarjetas con su diseño (como Templates).
+// My posts: los posts creados en Crear post. El último, destacado en grande; el resto, en una tabla.
 // Al abrir uno se muestra a pantalla completa en Crear post y al cerrarlo se vuelve aquí.
 
 import { $, esc, toast, copy } from './ui.js';
@@ -19,25 +19,47 @@ function matches(p) {
   return !q || `${p.title || ''} ${p.text || ''}`.toLowerCase().includes(q);
 }
 
-function card(p) {
-  const date = p.createdAt ? new Date(p.createdAt).toLocaleDateString('es', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-  const snippet = (p.text || '').replace(/\s+/g, ' ').trim();
+const fmtDate = (p, opts) => (p.createdAt ? new Date(p.createdAt).toLocaleDateString('es', opts) : '');
+const snippetOf = (p) => (p.text || '').replace(/\s+/g, ' ').trim();
+const byCreated = (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+
+function actions(p, size = 'small') {
   return `
-    <article class="tpl-card post-card">
-      <button class="tpl-preview post-card-preview" data-post-action="open" data-id="${esc(p.id)}" aria-label="Abrir ${esc(p.title || 'post')}">
+    <button class="btn primary ${size}" data-post-action="open" data-id="${esc(p.id)}">Abrir</button>
+    <button class="btn ghost ${size}" data-post-action="copy" data-id="${esc(p.id)}">Copiar texto</button>
+    <button class="btn ghost ${size} danger" data-post-action="delete" data-id="${esc(p.id)}">Borrar</button>`;
+}
+
+// El último creado, en grande: diseño a un lado y texto completo al otro.
+function highlight(p) {
+  return `
+    <article class="post-highlight">
+      <button class="post-highlight-preview" data-post-action="open" data-id="${esc(p.id)}" aria-label="Abrir ${esc(p.title || 'post')}">
         <div data-post-preview="${esc(p.id)}"></div>
       </button>
-      <div class="tpl-body">
-        <div class="tpl-title"><strong>${esc(p.title || 'Sin título')}</strong><span class="badge badge-pendiente">${esc(FORMAT_LABELS[p.format] || p.format)}</span></div>
-        <p class="muted small">${esc(date)}</p>
-        ${snippet ? `<p class="post-card-text">${esc(snippet)}</p>` : ''}
-        <div class="tpl-actions">
-          <button class="btn primary small" data-post-action="open" data-id="${esc(p.id)}">Abrir</button>
-          <button class="btn ghost small" data-post-action="copy" data-id="${esc(p.id)}">Copiar texto</button>
-          <button class="btn ghost small danger" data-post-action="delete" data-id="${esc(p.id)}">Borrar</button>
-        </div>
+      <div class="post-highlight-body">
+        <p class="eyebrow">Último creado · ${esc(fmtDate(p, { day: 'numeric', month: 'long', year: 'numeric' }))}</p>
+        <h2>${esc(p.title || 'Sin título')}</h2>
+        <span class="badge badge-pendiente">${esc(FORMAT_LABELS[p.format] || p.format)}</span>
+        <p class="post-highlight-text">${esc(p.text || '')}</p>
+        ${p.hashtags?.length ? `<p class="hashtags">${esc(p.hashtags.join(' '))}</p>` : ''}
+        <div class="actions start">${actions(p, '')}</div>
       </div>
     </article>`;
+}
+
+function row(p) {
+  return `
+    <tr>
+      <td class="posts-thumb"><button class="post-thumb-btn" data-post-action="open" data-id="${esc(p.id)}" aria-label="Abrir ${esc(p.title || 'post')}"><div data-post-preview="${esc(p.id)}"></div></button></td>
+      <td class="posts-main">
+        <button class="link post-title-link" data-post-action="open" data-id="${esc(p.id)}">${esc(p.title || 'Sin título')}</button>
+        <span class="muted small posts-snippet">${esc(snippetOf(p))}</span>
+      </td>
+      <td><span class="badge badge-pendiente">${esc(FORMAT_LABELS[p.format] || p.format)}</span></td>
+      <td class="muted small posts-date">${esc(fmtDate(p, { day: 'numeric', month: 'short', year: 'numeric' }))}</td>
+      <td class="posts-actions"><div class="actions">${actions(p)}</div></td>
+    </tr>`;
 }
 
 function renderList() {
@@ -45,11 +67,20 @@ function renderList() {
   if (!list) return;
   unmountPages(list);
   const all = getCreated();
-  const shown = all.filter(matches);
+  const shown = all.filter(matches).sort(byCreated);
+  const [first, ...rest] = shown;
   list.innerHTML = !all.length
     ? `<div class="empty-state"><p>Todavía no has creado posts.</p><a class="btn primary" href="#/crear">+ Crear post</a></div>`
     : shown.length
-      ? `<div class="tpl-grid posts-grid">${shown.map(card).join('')}</div>`
+      ? `${highlight(first)}
+         ${
+           rest.length
+             ? `<div class="posts-table-wrap"><table class="posts-table">
+                  <thead><tr><th scope="col"><span class="sr-only">Diseño</span></th><th scope="col">Post</th><th scope="col">Formato</th><th scope="col">Creado</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead>
+                  <tbody>${rest.map(row).join('')}</tbody>
+                </table></div>`
+             : ''
+         }`
       : '<p class="muted">No hay posts que coincidan con la búsqueda.</p>';
   for (const el of list.querySelectorAll('[data-post-preview]')) {
     const post = all.find((p) => p.id === el.dataset.postPreview);

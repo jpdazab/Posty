@@ -829,15 +829,47 @@ body:has(#create-root:not([hidden]) .post-modal) { overflow: hidden; }
 
 /* My posts */
 .nav-count-muted { background: var(--surface-2); color: var(--muted); }
-#posts-root .posts-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
-#posts-root .tpl-actions .btn { flex: 1 1 auto; justify-content: center; }
-@media (max-width: 900px) { #posts-root .posts-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 560px) { #posts-root .posts-grid { grid-template-columns: minmax(0, 1fr); } }
-.post-card-preview { display: block; width: 100%; border: 0; cursor: pointer; font: inherit; text-align: left; }
-.post-card-preview:hover .visual-frame { box-shadow: 0 0 0 2px var(--brand); }
-.post-card-preview:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
-.post-card-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 0.88rem; color: var(--text); }
 .posts-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 18px; }
 #posts-search { max-width: 360px; }
 #posts-search:focus-visible, #search:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 .create-posts-link { margin-top: 24px; }
+
+/* My posts: el último creado destacado y el resto en tabla */
+.post-highlight {
+  display: grid; grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr); gap: 28px; align-items: start;
+  margin-bottom: 28px; padding: 20px; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid color-mix(in srgb, var(--brand) 35%, var(--border));
+  box-shadow: 0 0 0 4px var(--brand-soft), var(--shadow);
+}
+.post-highlight-preview, .post-thumb-btn { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
+.post-highlight-preview .visual-frame { border-radius: 8px; box-shadow: var(--shadow); }
+.post-highlight-preview:hover .visual-frame, .post-thumb-btn:hover .visual-frame { box-shadow: 0 0 0 2px var(--brand); }
+.post-highlight-preview:focus-visible, .post-thumb-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.post-highlight-body { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 0; }
+.post-highlight-body h2 { margin: 0; font-size: 1.5rem; letter-spacing: -0.01em; }
+.post-highlight .eyebrow { margin: 0; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand); }
+.post-highlight-text { margin: 4px 0 0; white-space: pre-wrap; line-height: 1.55; max-height: 22em; overflow: auto; }
+.post-highlight .hashtags { margin: 0; }
+.posts-table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.posts-table { width: 100%; border-collapse: collapse; }
+.posts-table th { padding: 10px 14px; text-align: left; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
+.posts-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.posts-table tbody tr:last-child td { border-bottom: 0; }
+.posts-table tbody tr:hover { background: var(--surface-2); }
+.posts-thumb { width: 64px; }
+.posts-thumb .visual-frame { width: 52px; border-radius: 4px; }
+.posts-main { min-width: 220px; }
+.post-title-link { display: block; padding: 0; font-weight: 700; color: var(--text); text-align: left; }
+.posts-snippet { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; max-width: 460px; }
+.posts-date { white-space: nowrap; }
+.posts-actions .actions { flex-wrap: nowrap; justify-content: flex-end; }
+@media (max-width: 760px) {
+  .post-highlight { grid-template-columns: minmax(0, 1fr); padding: 14px; gap: 16px; }
+  .post-highlight-preview { max-width: 360px; }
+  .posts-table thead { display: none; }
+  .posts-table tr { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 4px 12px; padding: 12px; border-bottom: 1px solid var(--border); }
+  .posts-table td { padding: 0; border: 0; }
+  .posts-thumb { grid-row: span 4; }
+  .posts-main { min-width: 0; }
+  .posts-actions .actions { justify-content: flex-start; flex-wrap: wrap; }
+}
