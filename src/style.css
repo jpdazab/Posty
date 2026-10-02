@@ -873,3 +873,19 @@ body:has(#create-root:not([hidden]) .post-modal) { overflow: hidden; }
   .posts-main { min-width: 0; }
   .posts-actions .actions { justify-content: flex-start; flex-wrap: wrap; }
 }
+
+/* Buscador de tipografías de Google */
+.gf-modal { z-index: 60; }
+.gf-modal .modal-card { flex: 0 1 640px; width: min(640px, 100%); max-height: min(720px, calc(100vh - 48px)); display: flex; flex-direction: column; margin: auto; }
+.gf-modal .modal-body { display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1; }
+.gf-search { width: 100%; padding: 10px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; }
+.gf-search:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.gf-cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.gf-count { margin: 0; }
+.gf-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; min-height: 200px; border-top: 1px solid var(--border); }
+.gf-item { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; padding: 12px 6px; border: 0; border-bottom: 1px solid var(--border); background: none; color: var(--text); cursor: pointer; text-align: left; }
+.gf-item:hover, .gf-item:focus-visible { background: var(--brand-soft); outline: none; }
+.gf-item:disabled { opacity: 0.5; cursor: progress; }
+.gf-name { font-size: 1.35rem; line-height: 1.2; }
+.gf-more { padding: 12px 0; text-align: center; }
+.gf-empty { padding: 16px 6px; }

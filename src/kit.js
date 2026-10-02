@@ -4,6 +4,7 @@
 
 import { assetUrl, putAsset, deleteAsset, newAssetId, getAsset, blobToDataUrl, dataUrlToBlob } from './assets-db.js';
 import { getBackend } from './backend.js';
+import { loadGoogleFonts } from './google-fonts.js';
 
 // Colores del design system que se pueden cambiar (variable CSS → etiqueta y valor original).
 export const THEME_COLORS = [
@@ -60,6 +61,7 @@ function defaultKit() {
     brand: defaultBrand(),
     theme: { colors: {}, fonts: {}, handle: '', swipe: 'Swipe', logoAssetId: null },
     fonts: [], // { id, family, assetId, fileName }
+    googleFonts: [], // familias de Google Fonts añadidas (ver google-fonts.js)
     templateContent: {}, // id de plantilla integrada → contenido por defecto editado
     customTemplates: [], // ver newCustomTemplate()
   };
@@ -167,6 +169,15 @@ export async function addFont(file, family) {
   return name;
 }
 
+export function addGoogleFont(family) {
+  if (kit.googleFonts.includes(family)) return;
+  updateKit((k) => (k.googleFonts = [...k.googleFonts, family]));
+}
+
+export function removeGoogleFont(family) {
+  updateKit((k) => (k.googleFonts = k.googleFonts.filter((f) => f !== family)));
+}
+
 export async function removeFont(id) {
   const font = kit.fonts.find((f) => f.id === id);
   if (!font) return;
@@ -179,7 +190,7 @@ export async function removeFont(id) {
 
 export function allFontFamilies() {
   const bundled = kit.builtins ? BUILTIN_FONTS : BUNDLED_FONTS;
-  return [...new Set([...kit.fonts.map((f) => f.family), ...bundled, ...SYSTEM_FONTS])];
+  return [...new Set([...kit.fonts.map((f) => f.family), ...kit.googleFonts, ...bundled, ...SYSTEM_FONTS])];
 }
 
 // ---------- Marca ----------
@@ -288,7 +299,7 @@ export function getCustomTemplate(id) {
 // Carga el kit de la cuenta, sus archivos (fuentes, logo, fondos) y aplica el tema.
 export async function initKit() {
   kit = merge(await getBackend().loadKit());
-  await Promise.all(assetIds().map((id) => assetUrl(id)));
+  await Promise.all([...assetIds().map((id) => assetUrl(id)), loadGoogleFonts(kit.googleFonts)]);
   await applyTheme();
 }
 

@@ -14,6 +14,7 @@ import {
   allFontFamilies,
   addFont,
   removeFont,
+  removeGoogleFont,
   setLogo,
   storeImage,
   newCustomTemplate,
@@ -33,6 +34,7 @@ import { contentFromText, contentFromPage, designsFrom } from './layouts.js';
 const MAX_PDF_PAGES = 10;
 import { getBackend } from './backend.js';
 import { brandPreview, logoFields, colorFields, fontFields, brandInput, brandChange, brandClick, loadLogoColors, showWizard, syncBrandFields } from './wizard.js';
+import { GOOGLE_OPTION } from './google-fonts.js';
 
 // gen: panel "Generar diseños" → { source: 'url' | 'text', url, text, size, siteColors, loading, error, page, results }
 const ui = {
@@ -245,6 +247,22 @@ async function saveDraft(tpl) {
 
 // ---------- Marca: colores, tipografía, firma ----------
 
+// Tipografías de Google añadidas: se pueden quitar de la lista (las plantillas que las usan siguen igual).
+function googleFontList() {
+  const { googleFonts } = getKit();
+  return `<p class="muted small">Elige «＋ Más tipografías de Google…» en el desplegable para añadir cualquiera de las ${'1.900'} de Google Fonts.</p>
+    ${
+      googleFonts.length
+        ? `<ul class="font-list">${googleFonts
+            .map(
+              (f) => `<li><span style="font-family:'${esc(f)}'">${esc(f)}</span><small class="muted">Google Fonts</small>
+                <button class="link danger" data-design-action="remove-google-font" data-family="${esc(f)}">Quitar</button></li>`,
+            )
+            .join('')}</ul>`
+        : ''
+    }`;
+}
+
 // Marca definida con el asistente: cuatro colores, dos tipografías, firma y logo.
 function renderSimpleBrand() {
   const { fonts } = getKit();
@@ -254,6 +272,7 @@ function renderSimpleBrand() {
         <fieldset class="ed-group"><legend>Firma y logo</legend>${logoFields()}</fieldset>
         <fieldset class="ed-group"><legend>Colores</legend>${colorFields()}</fieldset>
         <fieldset class="ed-group"><legend>Tipografías</legend>${fontFields()}
+          ${googleFontList()}
           ${
             fonts.length
               ? `<ul class="font-list">${fonts
@@ -312,6 +331,7 @@ function renderBrand() {
                 ${allFontFamilies()
                   .map((f) => `<option ${theme.fonts[r.role] === f ? 'selected' : ''}>${esc(f)}</option>`)
                   .join('')}
+                ${GOOGLE_OPTION}
               </select>
             </label>`,
           ).join('')}
@@ -656,6 +676,10 @@ async function handle(btn) {
       renderDesigns();
       break;
     }
+    case 'remove-google-font':
+      removeGoogleFont(btn.dataset.family);
+      renderDesigns();
+      break;
     case 'remove-font':
       await removeFont(id);
       renderDesigns();

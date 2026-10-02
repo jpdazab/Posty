@@ -15,6 +15,7 @@ import {
   BRAND_COLORS,
   BRAND_FONTS,
 } from './kit.js';
+import { GOOGLE_OPTION } from './google-fonts.js';
 
 const STEPS = [
   { id: 'marca', label: 'Marca' },
@@ -201,6 +202,7 @@ export function fontFields() {
           ${allFontFamilies()
             .map((fam) => `<option ${fonts[f.key] === fam ? 'selected' : ''} style="font-family:${esc(fontStack(fam))}">${esc(fam)}</option>`)
             .join('')}
+          ${GOOGLE_OPTION}
         </select>
         <label class="btn ghost small">Subir fuente<input type="file" accept=".woff2,.woff,.ttf,.otf,font/*" data-brand-font-upload="${f.key}" hidden /></label>
       </div>

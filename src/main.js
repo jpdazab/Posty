@@ -4,12 +4,13 @@ import { $, esc, toast, copy, linkedinIcon } from './ui.js';
 import { initCreatePage, startFromDigest, renderCreate, initCreateData, refreshCreated, getCreated, onHistoryChange } from './create.js';
 import { initPostsPage, renderPosts } from './posts.js';
 import { initDesignsPage, renderDesigns, afterWizard, prepareDesigns } from './designs.js';
-import { initKit, getKit } from './kit.js';
+import { initKit, getKit, addGoogleFont } from './kit.js';
 import { showWizard } from './wizard.js';
 import { initTopics, initTopicsPanel, renderTopics } from './topics.js';
 import { initBackend, getBackend, mode as backendMode } from './backend.js';
 import { showLogin } from './auth.js';
 import { initAccountPage, renderAccount } from './account.js';
+import { initGoogleFontSelects } from './google-fonts.js';
 
 // Propuestas semanales del usuario: Markdown (formato PROPUESTAS.md) + archivos de cada semana.
 let weeks = [];
@@ -538,6 +539,7 @@ async function start() {
   initCreatePage();
   initDesignsPage();
   initPostsPage();
+  initGoogleFontSelects({ onAdd: addGoogleFont });
   const postsCount = () => ($('#nav-posts-count').textContent = getCreated().length || '');
   postsCount();
   onHistoryChange(postsCount);

@@ -14,6 +14,7 @@ import { layerCss, isText } from './layer-style.js';
 import { contrast } from './layouts.js';
 import { chartSvg, CHART_TYPES, SAMPLE_DATA, categoricalPalette, mix } from './charts.js';
 import { fillCss, fillBase, fillThemes, readableText, GRADIENT_KINDS, PATTERNS } from './fills.js';
+import { GOOGLE_OPTION } from './google-fonts.js';
 
 const LOGO = '__logo';
 const WEIGHTS = [300, 400, 500, 600, 700, 800, 900];
@@ -379,7 +380,7 @@ export function mountTemplateEditor(container, initial, { onSave, onCancel }) {
     return `
       ${field('Nombre', `<input type="text" data-te-prop="name" value="${esc(l.name || '')}" maxlength="40" />`)}
       ${field('Texto', `<textarea data-te-prop="sample" rows="3">${esc(l.sample || '')}</textarea>`)}
-      ${field('Tipografía', `<select data-te-prop="font">${fonts.map((f) => `<option ${f === l.font ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select>`)}
+      ${field('Tipografía', `<select data-te-prop="font">${fonts.map((f) => `<option ${f === l.font ? 'selected' : ''}>${esc(f)}</option>`).join('')}${GOOGLE_OPTION}</select>`)}
       <div class="ed-row">
         ${num('Tamaño', 'size', l.size, { min: 6, max: 600 })}
         ${field('Peso', `<select data-te-prop="weight">${WEIGHTS.map((w) => `<option ${Number(l.weight) === w ? 'selected' : ''}>${w}</option>`).join('')}</select>`)}
