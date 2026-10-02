@@ -6,7 +6,7 @@ import { getBackend, setPassword } from './backend.js';
 import { parseWeek } from './parser.js';
 import { reloadWeeks } from './main.js';
 
-const ui = { newToken: null, usage: null, tokenDate: undefined, weeks: [] };
+const ui = { newToken: null, usage: null, tokenDate: undefined, weeks: [], tokenError: null, creating: false };
 
 function ingestUrl() {
   return `${location.origin}/api/proposals`;
@@ -88,8 +88,9 @@ function renderCloud() {
                  <button class="btn ghost small" data-account-action="copy-snippet">Copiar instrucciones para la rutina</button>
                </div>
              </div>`
-          : `<div class="actions start"><button class="btn primary" data-account-action="create-token">${ui.tokenDate ? 'Crear token nuevo' : 'Crear token'}</button></div>`
+          : `<div class="actions start"><button class="btn primary" data-account-action="create-token" ${ui.creating ? 'disabled' : ''}>${ui.creating ? 'Creando…' : ui.tokenDate ? 'Crear token nuevo' : 'Crear token'}</button></div>`
       }
+      ${ui.tokenError ? `<p class="error-text" role="alert">${esc(ui.tokenError)}</p>` : ''}
     </section>
 
     <section class="ed-group account-card">
@@ -148,13 +149,21 @@ async function handle(btn) {
       await backend.signOut();
       break;
     case 'create-token':
-      if (ui.tokenDate && !window.confirm('El token anterior dejará de funcionar y tendrás que actualizar tu rutina. ¿Seguir?')) return;
+      if (ui.tokenDate && !window.confirm('El token anterior dejará de funcionar y tendrás que actualizar el conector de Claude y la rutina. ¿Seguir?')) return;
+      ui.creating = true;
+      ui.tokenError = null;
+      renderAccount();
       try {
-        ui.newToken = await backend.createIngestToken();
+        const token = await backend.createIngestToken();
+        if (typeof token !== 'string' || !token.startsWith('posty_')) throw new Error('Supabase no devolvió un token. Vuelve a ejecutar supabase/schema.sql completo en el SQL Editor (ver SETUP.md).');
+        ui.newToken = token;
         ui.tokenDate = new Date().toISOString();
       } catch (err) {
-        toast(err.message);
+        console.error(err);
+        // El error se queda a la vista (no solo en un aviso que desaparece).
+        ui.tokenError = err.message || 'No se pudo crear el token.';
       }
+      ui.creating = false;
       renderAccount();
       break;
     case 'copy-token':

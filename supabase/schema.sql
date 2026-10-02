@@ -194,3 +194,6 @@ as $$
 $$;
 
 revoke all on function public.refund_ai_credit(uuid) from public, anon, authenticated;
+
+-- Que la API de Supabase vea al momento las tablas y funciones nuevas (sin esperar a que refresque).
+notify pgrst, 'reload schema';
