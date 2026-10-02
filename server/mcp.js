@@ -1,8 +1,10 @@
 // Conector de Claude (servidor MCP remoto, Streamable HTTP sin estado) para que cada persona use
 // su propio Claude (su suscripción, no la API) para crear posts y propuestas en Posty.
 //
-// Dirección: https://<posty>/api/mcp?token=posty_…  (el token personal de Cuenta; también vale
-// "Authorization: Bearer posty_…"). Cada petición es JSON-RPC 2.0 y se responde con JSON.
+// Dirección: https://<posty>/api/mcp/posty_…  (el token personal de Cuenta en la ruta; también valen
+// "?token=posty_…" y "Authorization: Bearer posty_…"). Cada petición es JSON-RPC 2.0 y se responde con JSON.
+// Un token que falta o no vale NO devuelve 401: Claude lo interpretaría como "necesita OAuth" y pediría
+// registrarse. Se conecta igual y cada herramienta responde con el motivo, que la persona ve en el chat.
 //
 // Herramientas: posty_get_topics, posty_list_templates, posty_list_proposals,
 // posty_add_proposals y posty_create_post.
@@ -337,6 +339,7 @@ async function dispatch(msg, ctx) {
       const name = msg.params?.name;
       const run = TOOL_RUN[name];
       if (!run) return rpcError(msg.id, -32602, `Herramienta desconocida: ${name}`);
+      if (ctx.authError) return rpcResult(msg.id, { content: [{ type: 'text', text: ctx.authError }], isError: true });
       try {
         const out = await run(ctx, msg.params?.arguments || {});
         return rpcResult(msg.id, { content: [{ type: 'text', text: out.text }], structuredContent: out.structured });
@@ -361,9 +364,14 @@ export async function handleMcp(req, deps = {}) {
   // Sin flujo SSE: solo POST (las respuestas van en el propio JSON).
   if (req.method !== 'POST') return { status: 405, headers: { Allow: 'POST' }, json: rpcError(null, -32000, 'Usa POST') };
   const db = deps.admin === undefined ? adminClient() : deps.admin;
-  const token = String(req.query?.token || '').trim() || undefined;
-  const owner = await routineOwner(db, req.headers, token ?? undefined);
-  if (owner.error) return { status: owner.error.status, json: rpcError(null, -32001, owner.error.json.error) };
+  const fromPath = decodeURIComponent((String(req.path || '').match(/\/api\/mcp\/([^/]+)\/?$/) || [])[1] || '');
+  const token = (String(req.query?.token || '').trim() || fromPath.trim()) || undefined;
+  const owner = await routineOwner(db, req.headers, token);
+  const authError = owner.error
+    ? owner.error.status === 401
+      ? 'Posty no reconoce el token de este conector (falta, está mal copiado o se creó uno nuevo). En Posty → Cuenta → Conectar con Claude crea un token, copia la dirección del conector y ponla en los ajustes del conector de Claude.'
+      : `Posty no está disponible ahora mismo: ${owner.error.json.error}`
+    : null;
 
   let payload;
   try {
@@ -371,7 +379,7 @@ export async function handleMcp(req, deps = {}) {
   } catch {
     return { status: 400, json: rpcError(null, -32700, 'JSON no válido') };
   }
-  const ctx = { db, userId: owner.userId, origin: originOf(req.headers) };
+  const ctx = { db, userId: owner.userId, origin: originOf(req.headers), authError };
   const batch = Array.isArray(payload);
   const responses = (await Promise.all((batch ? payload : [payload]).map((m) => dispatch(m, ctx)))).filter(Boolean);
   if (!responses.length) return { status: 202 }; // solo notificaciones

@@ -33,12 +33,22 @@ test('mcp: inicializa, lista herramientas y responde 202 a notificaciones', asyn
   assert.deepEqual(batch.json, [{ jsonrpc: '2.0', id: 5, result: {} }]);
 });
 
-test('mcp: token obligatorio (en la URL o como Bearer) y solo POST', async () => {
+test('mcp: token en la ruta, en ?token= o como Bearer; si falta o no vale, conecta y avisa sin 401', async () => {
   const admin = setup();
-  assert.equal((await rpc(admin, { jsonrpc: '2.0', id: 1, method: 'ping' }, { token: '' })).status, 401);
-  assert.equal((await rpc(admin, { jsonrpc: '2.0', id: 1, method: 'ping' }, { token: 'malo' })).status, 401);
-  const bearer = await rpc(admin, { jsonrpc: '2.0', id: 1, method: 'ping' }, { token: '', headers: { authorization: 'Bearer posty_ok' } });
+  const ping = { jsonrpc: '2.0', id: 1, method: 'ping' };
+  const inPath = await handleMcp({ method: 'POST', headers: {}, query: {}, path: '/api/mcp/posty_ok', body: Buffer.from(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'posty_list_templates', arguments: {} } })) }, { admin });
+  assert.equal(inPath.json.result.isError, undefined);
+  assert.match(inPath.json.result.content[0].text, /Cita/);
+  const bearer = await rpc(admin, ping, { token: '', headers: { authorization: 'Bearer posty_ok' } });
   assert.equal(bearer.status, 200);
+  for (const token of ['', 'malo']) {
+    // Nunca 401: Claude intentaría OAuth y pediría registrarse.
+    const init = await rpc(admin, { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } }, { token });
+    assert.equal(init.status, 200);
+    const tool = await rpc(admin, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'posty_get_topics', arguments: {} } }, { token });
+    assert.equal(tool.json.result.isError, true);
+    assert.match(tool.json.result.content[0].text, /no reconoce el token/);
+  }
   const get = await handleMcp({ method: 'GET', headers: {}, query: {}, body: Buffer.alloc(0) }, { admin });
   assert.equal(get.status, 405);
   assert.equal((await handleMcp({ method: 'POST', headers: {}, query: { token: 'posty_ok' }, body: Buffer.from('{no') }, { admin })).status, 400);

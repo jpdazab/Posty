@@ -118,9 +118,9 @@ Si el design system cambia, vuelve a copiar esos archivos desde el artifact.
   - `POST /api/digest`: genera con Claude las propuestas de una semana con los temas guardados de la persona
     (sesión + `AI_MONTHLY_LIMIT`, un crédito por propuesta). Devuelve el Markdown, que la web guarda como semana.
   - `POST /api/url`: lee una web (sin IA, solo direcciones públicas) para Generar diseños. Exige sesión.
-  - `POST /api/mcp?token=…`: conector de Claude (servidor MCP remoto, Streamable HTTP sin estado) con las
+  - `POST /api/mcp/<token>`: conector de Claude (servidor MCP remoto, Streamable HTTP sin estado) con las
     herramientas `posty_get_topics`, `posty_list_templates`, `posty_list_proposals`, `posty_add_proposals`
-    y `posty_create_post`. Se autentica con el token personal (en la URL o como Bearer).
+    y `posty_create_post`. Se autentica con el token personal (en la ruta, en `?token=` o como Bearer); un token que no vale no devuelve 401 (Claude pediría OAuth): las herramientas responden con el motivo.
   - `GET /api/topics`: los temas del digest de la persona del token, en JSON y como texto (`brief`).
 - **Supabase** (`supabase/schema.sql`): tablas con seguridad por usuario y Storage para archivos.
   `supabase/tests/` prueba que cada usuario solo accede a lo suyo.

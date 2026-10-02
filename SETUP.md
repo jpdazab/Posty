@@ -123,7 +123,7 @@ Cada persona puede usar su propio Claude (cualquier plan; el gratuito admite un 
 desde el chat de Claude, sin gastar la API:
 
 1. En Posty: **Cuenta → Conectar con Claude → Crear token** y **Copiar dirección del conector**
-   (`https://<tu-posty>/api/mcp?token=…`). La dirección lleva el token: no se comparte.
+   (`https://<tu-posty>/api/mcp/<token>`). La dirección lleva el token: no se comparte.
 2. En Claude: **Ajustes → Conectores → Añadir conector personalizado**, nombre `Posty` y esa dirección.
 3. En un chat, activa Posty y pide, por ejemplo: *"Prepara mis propuestas de la semana que viene con mis
    temas de Posty"* o *"Crea un post con mi plantilla Dato del día sobre…"*.

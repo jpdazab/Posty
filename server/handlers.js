@@ -289,7 +289,7 @@ export function nodeHandler(handler, limit) {
     let result;
     try {
       const body = await readBody(req, limit);
-      result = await handler({ method: req.method, headers: req.headers, query: Object.fromEntries(url.searchParams), body });
+      result = await handler({ method: req.method, headers: req.headers, query: Object.fromEntries(url.searchParams), path: url.pathname, body });
     } catch (err) {
       result = err instanceof GenerateError ? reply(err.status, { error: err.message }) : reply(500, { error: 'Error inesperado.' });
       if (!(err instanceof GenerateError)) console.error(err);

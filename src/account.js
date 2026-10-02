@@ -27,7 +27,7 @@ Envía también la tanda a Posty, la plataforma donde reviso y publico los posts
 
 // Dirección del conector de Claude (servidor MCP de Posty) con el token personal.
 function connectorUrl(token) {
-  return `${location.origin}/api/mcp?token=${encodeURIComponent(token)}`;
+  return `${location.origin}/api/mcp/${encodeURIComponent(token)}`;
 }
 
 function renderLocal() {
