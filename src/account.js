@@ -65,7 +65,7 @@ function renderCloud() {
 
     <section class="ed-group account-card">
       <h2>Conectar con Claude</h2>
-      <p class="muted">Usa tu propio Claude (tu plan Pro, Max, Team o Enterprise, sin API) para crear posts y propuestas en Posty desde el chat de Claude. Funciona con un token personal, el mismo que usa tu rutina semanal; si creas uno nuevo, el anterior deja de funcionar en los dos sitios.</p>
+      <p class="muted">Usa tu propio Claude (cualquier plan, también el gratuito, que admite un conector personalizado; sin API) para crear posts y propuestas en Posty desde el chat de Claude. Funciona con un token personal, el mismo que usa tu rutina semanal; si creas uno nuevo, el anterior deja de funcionar en los dos sitios.</p>
       <p>${ui.tokenDate === undefined ? 'Cargando…' : ui.tokenDate ? `Tienes un token creado el ${esc(new Date(ui.tokenDate).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' }))}.` : 'Todavía no has creado un token.'}</p>
       ${
         ui.newToken

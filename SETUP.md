@@ -119,7 +119,7 @@ Sin rutina también se puede: **Cuenta → Subir una semana a mano** (el `.md` y
 
 ## 6b. Conectar Claude (sin API)
 
-Cada persona puede usar su propio Claude (planes Pro, Max, Team o Enterprise) para trabajar con Posty
+Cada persona puede usar su propio Claude (cualquier plan; el gratuito admite un solo conector personalizado) para trabajar con Posty
 desde el chat de Claude, sin gastar la API:
 
 1. En Posty: **Cuenta → Conectar con Claude → Crear token** y **Copiar dirección del conector**
