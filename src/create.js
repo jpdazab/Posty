@@ -11,6 +11,7 @@ import { builtinPost, customPost, BUILTIN_TEMPLATES } from './templates.js';
 import { getKit, getCustomTemplate, setTemplateContent } from './kit.js';
 import { textLayers, postLayers, isText } from './layer-style.js';
 import { CHART_TYPES } from './charts.js';
+import { generateAiImage, hasOpenAiKey, suggestPrompt } from './ai-image.js';
 import { getBackend } from './backend.js';
 import {
   normalizePost,
@@ -67,6 +68,7 @@ const state = {
   isNew: false, // post todavía no guardado (pegado o desde cero)
   templateEdit: null, // id de plantilla integrada cuyo contenido por defecto se está editando
   needsCode: false,
+  aiImage: null, // { target: 'layer:<id>' | 'visual:<ruta>', ratio, prompt, quality, loading, error }
 };
 
 // ---------- Almacenamiento ----------
@@ -362,9 +364,33 @@ function slideFields(prefix, dataIndex) {
              <input type="file" accept="image/*" data-image="${prefix}" data-index="${dataIndex ?? ''}" />
              <small class="muted">${v.src ? 'Imagen cargada. Elige otra para reemplazarla.' : 'Se recorta para llenar el hueco de 991 × 637.'}</small>
            </label>
+           <div class="ed-field">${aiImageControls(`visual:${prefix}`, (991 / 637).toFixed(3))}</div>
            ${field('Descripción de la imagen', `${prefix}.visual.alt`, { hint: 'Texto alternativo, para accesibilidad.' })}`
         : ''
     }`;
+}
+
+// Botón y panel "Generar con ChatGPT" de un hueco de imagen (ratio = ancho / alto del hueco).
+function aiImageControls(target, ratio) {
+  const ai = state.aiImage;
+  if (ai?.target !== target) {
+    return `<button class="btn ghost small" data-create-action="ai-image-open" data-target="${esc(target)}" data-ratio="${ratio}">✨ Generar con ChatGPT</button>`;
+  }
+  if (!hasOpenAiKey()) {
+    return `<div class="ai-panel"><p class="small">Para generar imágenes con ChatGPT, añade tu clave de API de OpenAI en <a href="#/cuenta">Cuenta → Imágenes con ChatGPT</a>.</p>
+      <div class="actions start"><button class="btn ghost small" data-create-action="ai-image-cancel">Cerrar</button></div></div>`;
+  }
+  return `<div class="ai-panel">
+    <label class="ed-field"><span>Qué imagen quieres</span><textarea data-ai-prompt rows="4" ${ai.loading ? 'disabled' : ''}>${esc(ai.prompt)}</textarea></label>
+    <div class="ai-row">
+      <label class="ed-field"><span>Calidad</span><select data-ai-quality ${ai.loading ? 'disabled' : ''}>
+        ${[['low', 'Rápida'], ['medium', 'Normal'], ['high', 'Alta (más lenta)']].map(([v, l]) => `<option value="${v}" ${ai.quality === v ? 'selected' : ''}>${l}</option>`).join('')}
+      </select></label>
+      <button class="btn primary small" data-create-action="ai-image-run" ${ai.loading ? 'disabled' : ''}>${ai.loading ? 'Generando… (hasta 1 min)' : 'Generar imagen'}</button>
+      ${ai.loading ? '' : '<button class="btn ghost small" data-create-action="ai-image-cancel">Cancelar</button>'}
+    </div>
+    ${ai.error ? `<p class="error-text">${esc(ai.error)}</p>` : '<p class="muted small">Se cobra en tu cuenta de OpenAI. La imagen se recorta para llenar el hueco.</p>'}
+  </div>`;
 }
 
 function renderGraphicEditor(post) {
@@ -382,8 +408,10 @@ function renderGraphicEditor(post) {
               return `<div class="ed-field"><span>${esc(l.name || 'Imagen')}</span>
                 <div class="actions start">
                   <label class="btn ghost small">${chosen || l.assetId ? 'Cambiar imagen' : 'Elegir imagen'}<input type="file" accept="image/*" data-post-image="${esc(l.id)}" hidden /></label>
+                  ${state.aiImage?.target === `layer:${l.id}` ? '' : aiImageControls(`layer:${l.id}`, (l.w / (l.h || l.w)).toFixed(3))}
                   ${chosen ? `<button class="link danger" data-create-action="clear-image" data-layer="${esc(l.id)}">${l.assetId ? 'Volver a la de la plantilla' : 'Quitar'}</button>` : ''}
                 </div>
+                ${state.aiImage?.target === `layer:${l.id}` ? aiImageControls(`layer:${l.id}`, l.w / (l.h || l.w)) : ''}
                 <small class="muted">${chosen ? 'Imagen elegida para este post.' : l.assetId ? 'Ahora se usa la imagen de la plantilla.' : 'Sin imagen: el hueco no sale en el PNG.'}</small></div>`;
             }
             return `<label class="ed-field"><span>${esc(l.name || 'Gráfica')} <em class="bb">${esc(CHART_TYPES[l.chart] || 'Gráfica')}</em></span>
@@ -612,6 +640,7 @@ function schedulePreview() {
 
 function showResult(post, { editing = false, isNew = false } = {}) {
   state.result = post;
+  state.aiImage = null;
   state.format = post.format;
   state.templateId = post.templateId || null;
   state.step = 'result';
@@ -809,6 +838,43 @@ async function handle(btn) {
       toast('Cambios guardados');
       renderCreate();
       break;
+    case 'ai-image-open':
+      state.aiImage = { target: btn.dataset.target, ratio: Number(btn.dataset.ratio) || 1, prompt: suggestPrompt(post), quality: 'medium', loading: false, error: null };
+      renderCreate();
+      document.querySelector('[data-ai-prompt]')?.focus();
+      break;
+    case 'ai-image-cancel':
+      state.aiImage = null;
+      renderCreate();
+      break;
+    case 'ai-image-run': {
+      const ai = state.aiImage;
+      if (!ai || ai.loading) return;
+      if (!ai.prompt.trim()) {
+        ai.error = 'Describe la imagen que quieres.';
+        renderCreate();
+        return;
+      }
+      ai.loading = true;
+      ai.error = null;
+      renderCreate();
+      try {
+        const image = await generateAiImage({ prompt: ai.prompt, ratio: ai.ratio, quality: ai.quality });
+        // El post puede haber cambiado mientras se generaba: se aplica al post actual.
+        const current = state.result;
+        const [kind, ...rest] = ai.target.split(':');
+        const where = rest.join(':');
+        if (kind === 'layer') current.images = { ...(current.images || {}), [where]: image };
+        else getPath(current, where).visual.src = image;
+        state.aiImage = null;
+        toast('Imagen generada ✓');
+      } catch (err) {
+        ai.loading = false;
+        ai.error = err.message;
+      }
+      renderCreate();
+      break;
+    }
     case 'clear-image':
       delete post.images[btn.dataset.layer];
       renderCreate();
@@ -849,6 +915,14 @@ async function handle(btn) {
 
 function handleInput(e) {
   const el = e.target;
+  if (state.aiImage && el.dataset.aiPrompt !== undefined) {
+    state.aiImage.prompt = el.value;
+    return;
+  }
+  if (state.aiImage && el.dataset.aiQuality !== undefined) {
+    state.aiImage.quality = el.value;
+    return;
+  }
   const post = state.result;
   if (!post || el.type === 'file') return;
   if (el.dataset.field) {

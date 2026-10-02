@@ -132,6 +132,13 @@ Las propuestas aparecen en el AI Digest y los posts con diseño en Crear post (a
 Posty se actualiza solo). El token es el mismo de la rutina semanal: si se crea uno nuevo, hay que
 actualizar el conector y la rutina.
 
+## 6c. Imágenes con ChatGPT (opcional)
+
+Cada persona que quiera generar imágenes pone su clave de API de OpenAI en **Cuenta → Imágenes con ChatGPT**
+(se crea en platform.openai.com → API keys, con saldo en Billing; OpenAI puede pedir verificar la
+organización para los modelos de imagen). La clave queda solo en su navegador y cada imagen se cobra en su
+cuenta de OpenAI. No hace falta configurar nada en Vercel.
+
 ## 7. Pasar las semanas que ya existen (opcional)
 
 Las semanas guardadas en la carpeta `propuestas/` del repositorio ya no se muestran solas.

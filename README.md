@@ -59,6 +59,9 @@ Páginas del menú lateral:
 
 - **Cuenta**: sesión, contraseña, uso de Claude del mes, token personal (conector de Claude y rutina semanal)
   y subida manual de semanas.
+- **Imágenes con ChatGPT**: cada persona guarda en Cuenta su clave de API de OpenAI (solo en su navegador)
+  y, en Crear post, cada hueco de imagen tiene "Generar con ChatGPT" con un prompt sugerido (tema del post,
+  colores de la marca, sin texto) que se puede editar. Cada imagen se cobra en su cuenta de OpenAI.
 - **Conector de Claude** (MCP): cada persona añade Posty como conector personalizado en Claude y, desde
   su chat (con su plan de Claude, sin API), lee sus temas y plantillas, crea propuestas en el AI Digest y
   posts con diseño en Crear post.
@@ -121,6 +124,9 @@ Si el design system cambia, vuelve a copiar esos archivos desde el artifact.
   - `POST /api/mcp/<token>`: conector de Claude (servidor MCP remoto, Streamable HTTP sin estado) con las
     herramientas `posty_get_topics`, `posty_list_templates`, `posty_list_proposals`, `posty_add_proposals`
     y `posty_create_post`. Se autentica con el token personal (en la ruta, en `?token=` o como Bearer); un token que no vale no devuelve 401 (Claude pediría OAuth): las herramientas responden con el motivo.
+  - `POST /api/image`: genera una imagen con la API de OpenAI (`gpt-image-2`, y si la cuenta no tiene acceso,
+    `gpt-image-1.5` o `gpt-image-1`; se cambia con `OPENAI_IMAGE_MODELS`) usando la clave de la persona
+    (cabecera `x-openai-key`, no se guarda). Exige sesión de Posty.
   - `GET /api/topics`: los temas del digest de la persona del token, en JSON y como texto (`brief`).
 - **Supabase** (`supabase/schema.sql`): tablas con seguridad por usuario y Storage para archivos.
   `supabase/tests/` prueba que cada usuario solo accede a lo suyo.

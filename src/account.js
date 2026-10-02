@@ -3,6 +3,7 @@
 
 import { $, esc, toast, copy } from './ui.js';
 import { getBackend, setPassword } from './backend.js';
+import { getOpenAiKey, setOpenAiKey } from './ai-image.js';
 import { parseWeek } from './parser.js';
 import { reloadWeeks } from './main.js';
 
@@ -30,12 +31,39 @@ function connectorUrl(token) {
   return `${location.origin}/api/mcp/${encodeURIComponent(token)}`;
 }
 
+// Clave de OpenAI para las imágenes con ChatGPT: solo en este navegador.
+function renderOpenAi() {
+  const key = getOpenAiKey();
+  const masked = key ? `${key.slice(0, 7)}…${key.slice(-4)}` : '';
+  return `
+    <section class="ed-group account-card">
+      <h2>Imágenes con ChatGPT</h2>
+      <p class="muted">Genera las imágenes de tus posts con la API de imágenes de OpenAI (la de ChatGPT). Usa tu propia clave: cada imagen se cobra en tu cuenta de OpenAI, aparte de la suscripción de ChatGPT.</p>
+      ${
+        key
+          ? `<p>Clave guardada en este navegador: <code>${esc(masked)}</code></p>
+             <div class="actions start"><button class="btn ghost small danger" data-account-action="remove-openai">Quitar clave</button></div>`
+          : `<form class="password-form" id="openai-form" novalidate>
+               <label class="field">Clave de API de OpenAI<input type="password" id="openai-key" autocomplete="off" placeholder="sk-…" /></label>
+               <div class="actions start"><button class="btn primary" type="submit">Guardar clave</button></div>
+             </form>
+             <ol class="steps small">
+               <li>En <strong>platform.openai.com → API keys</strong>, crea una clave y cópiala.</li>
+               <li>Añade saldo en <strong>Billing</strong>. Para los modelos de imagen, OpenAI puede pedir verificar tu organización (<strong>Settings → Organization</strong>).</li>
+               <li>Pégala aquí. Después, en Crear post, cada hueco de imagen tendrá <strong>✨ Generar con ChatGPT</strong>.</li>
+             </ol>`
+      }
+      <p class="muted small">La clave se guarda solo en este navegador (no en tu cuenta de Posty) y se envía a OpenAI al generar cada imagen. En otro navegador o dispositivo tendrás que añadirla otra vez.</p>
+    </section>`;
+}
+
 function renderLocal() {
   return `
     <section class="ed-group account-card">
       <h2>Modo local</h2>
       <p class="muted">Posty está funcionando sin cuenta: todo se guarda en este navegador. Para tener usuarios con login, propuestas semanales por persona y datos en la nube, configura Supabase siguiendo <code>SETUP.md</code>.</p>
-    </section>`;
+    </section>
+    ${renderOpenAi()}`;
 }
 
 function renderCloud() {
@@ -56,6 +84,8 @@ function renderCloud() {
         <div class="actions start"><button class="btn primary" type="submit">Guardar contraseña</button></div>
       </form>
     </section>
+
+    ${renderOpenAi()}
 
     <section class="ed-group account-card">
       <h2>Generación con Claude</h2>
@@ -169,6 +199,11 @@ async function handle(btn) {
     case 'copy-token':
       toast((await copy(ui.newToken)) ? 'Token copiado ✓' : 'No se pudo copiar');
       break;
+    case 'remove-openai':
+      setOpenAiKey('');
+      toast('Clave de OpenAI quitada de este navegador');
+      renderAccount();
+      break;
     case 'copy-connector':
       toast((await copy(connectorUrl(ui.newToken))) ? 'Dirección del conector copiada ✓' : 'No se pudo copiar');
       break;
@@ -197,6 +232,14 @@ export function initAccountPage() {
     handle(btn);
   });
   root.addEventListener('submit', async (e) => {
+    if (e.target.id === 'openai-form') {
+      e.preventDefault();
+      const key = $('#openai-key').value.trim();
+      if (!/^sk-[\w-]{10,}$/.test(key)) return toast('Esa no parece una clave de OpenAI: empieza por "sk-".');
+      toast(setOpenAiKey(key) ? 'Clave guardada en este navegador ✓' : 'No se pudo guardar la clave en este navegador');
+      renderAccount();
+      return;
+    }
     if (e.target.id !== 'password-form') return;
     e.preventDefault();
     const a = $('#new-password').value;

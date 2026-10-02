@@ -6,6 +6,7 @@
 // - POST /api/proposals?week=AAAA-Www&file=x.png Un archivo de la semana (imagen o PDF).
 // - POST /api/digest     { which, today, extra } Genera las propuestas de una semana con Claude (sesión + límite).
 // - POST /api/url        { url }                  Lee una web (sin IA) para proponer diseños (sesión).
+// - POST /api/image      { prompt, size, quality } Imagen con ChatGPT (OpenAI) con la clave de la persona (sesión).
 // - GET  /api/topics                             Temas del AI Digest de la persona (rutina semanal, token personal).
 
 import { createHash } from 'node:crypto';
@@ -15,6 +16,7 @@ import { parseWeek } from '../src/parser.js';
 import { normalizeSettings, settingsBrief } from '../src/topics-format.js';
 import { generateWeek } from './digest.js';
 import { readUrl } from './url-info.js';
+import { generateImage } from './image.js';
 
 export const MAX_MARKDOWN = 1024 * 1024; // 1 MB
 export const MAX_FILE = 4 * 1024 * 1024; // 4 MB (Vercel admite 4,5 MB por petición)
@@ -118,6 +120,36 @@ export async function handleUrl(req, deps = {}) {
     if (err?.name === 'TimeoutError' || err?.name === 'AbortError') return reply(504, { error: 'La web tardó demasiado en responder.' });
     console.error(err);
     return reply(502, { error: 'No se pudo leer esa web.' });
+  }
+}
+
+// ---------- /api/image ----------
+
+// La clave de OpenAI llega en x-openai-key en cada petición (se guarda solo en el navegador de la persona).
+export async function handleImage(req, deps = {}) {
+  if (req.method !== 'POST') return reply(405, { error: 'Método no permitido' });
+  const db = deps.admin === undefined ? adminClient() : deps.admin;
+  const generate = deps.generateImage || generateImage;
+  let body;
+  try {
+    body = JSON.parse(req.body?.toString('utf8') || '{}');
+  } catch {
+    return reply(400, { error: 'La petición no es JSON válido.' });
+  }
+  try {
+    if (db) {
+      const token = bearer(req.headers);
+      if (!token) return reply(401, { error: 'Inicia sesión en Posty para generar imágenes.' });
+      const { data, error } = await db.auth.getUser(token);
+      if (error || !data?.user) return reply(401, { error: 'Tu sesión caducó. Recarga la página.' });
+    } else {
+      checkAccess(req.headers['x-posty-code']);
+    }
+    return reply(200, await generate(body, req.headers['x-openai-key']));
+  } catch (err) {
+    if (err instanceof GenerateError) return reply(err.status, { error: err.message });
+    console.error(err);
+    return reply(500, { error: 'Error inesperado al generar la imagen.' });
   }
 }
 
