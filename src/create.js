@@ -23,6 +23,7 @@ import {
   frameHtml,
   fitVisuals,
   downloadPngs,
+  copyPng,
   downloadPdf,
   blackbirdIssues,
   COVER_TONES,
@@ -72,6 +73,8 @@ const state = {
   needsCode: false,
   fullscreen: false, // post a la vista: pantalla completa con el texto a la izquierda y el diseño a la derecha
   aiImage: null, // { target: 'layer:<id>' | 'visual:<ruta>', ratio, prompt, quality, loading, error }
+  seedTitle: '', // título de la propuesta del AI Digest que se está diseñando
+  publishHelp: false, // guía «Terminar en LinkedIn» tras pulsar Publicar
 };
 
 // ---------- Almacenamiento ----------
@@ -527,6 +530,7 @@ function renderResult(post) {
           <button class="btn primary" data-create-action="publish">${linkedinIcon()} Publicar</button>
           <button class="btn ghost" data-create-action="copy">Copiar texto</button>
           <button class="btn ghost" data-create-action="edit">Editar</button>
+          ${post.format === 'carousel' ? '' : '<button class="btn ghost" data-create-action="copy-image">Copiar imagen</button>'}
           <button class="btn ghost" data-create-action="png">⬇ ${post.format === 'carousel' ? 'PNGs' : 'PNG'}</button>
           ${post.format === 'carousel' ? '<button class="btn ghost" data-create-action="pdf">⬇ PDF</button>' : ''}
           <button class="btn ghost danger" data-create-action="delete" data-id="${esc(post.id)}">Borrar</button>
@@ -545,6 +549,22 @@ function renderResult(post) {
 
 // Post ya creado a pantalla completa: texto a la izquierda y diseño a la derecha.
 // "Editar" cambia la columna izquierda por el editor; la derecha sigue siendo la vista previa en vivo.
+function publishHelp(post) {
+  const carousel = post.format === 'carousel';
+  return `<div class="publish-help" role="status">
+    <button class="link publish-help-close" data-create-action="close-help" aria-label="Cerrar">✕</button>
+    <strong>Terminar en LinkedIn</strong>
+    <ol>
+      <li>El texto ya está en LinkedIn (si no aparece, pégalo: está copiado).</li>
+      ${
+        carousel
+          ? '<li>Descarga el <button class="link" data-create-action="pdf">PDF del carrusel</button> y en LinkedIn súbelo con <em>Añadir documento</em>.</li>'
+          : '<li><button class="btn primary small" data-create-action="copy-image">Copiar imagen</button> y pégala en el mismo post con <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd>.</li>'
+      }
+    </ol>
+  </div>`;
+}
+
 function renderFullscreen(post) {
   const text = finalText(post);
   const over = text.length > LINKEDIN_MAX_CHARS;
@@ -566,6 +586,7 @@ function renderFullscreen(post) {
               : `<button class="btn primary small" data-create-action="publish">${linkedinIcon()} Publicar</button>
                  <button class="btn ghost small" data-create-action="copy">Copiar texto</button>
                  <button class="btn ghost small" data-create-action="edit">Editar</button>
+                 ${post.format === 'carousel' ? '' : '<button class="btn ghost small" data-create-action="copy-image" title="Para pegarla en LinkedIn con Ctrl/⌘+V">Copiar imagen</button>'}
                  <button class="btn ghost small" data-create-action="png">⬇ ${post.format === 'carousel' ? 'PNGs' : 'PNG'}</button>
                  ${post.format === 'carousel' ? '<button class="btn ghost small" data-create-action="pdf">⬇ PDF</button>' : ''}
                  <button class="btn ghost small danger" data-create-action="delete" data-id="${esc(post.id)}">Borrar</button>`
@@ -574,6 +595,7 @@ function renderFullscreen(post) {
       </header>
       <div class="pm-body">
         <section class="pm-text">
+          ${state.publishHelp && !editing ? publishHelp(post) : ''}
           ${
             editing
               ? `${template ? '<p class="muted small">Este es el contenido con el que empieza la plantilla al usarla en Crear post o al empezar desde cero.</p>' : ''}${renderEditor(post, { template })}`
@@ -714,6 +736,7 @@ function schedulePreview() {
 
 // Todos los posts (nuevos o abiertos de la lista) se muestran a pantalla completa.
 function showResult(post, { editing = false, isNew = false, fullscreen = true } = {}) {
+  state.publishHelp = false;
   state.fullscreen = fullscreen;
   state.result = post;
   state.aiImage = null;
@@ -798,7 +821,7 @@ export function editTemplate(id) {
 }
 
 function resetToStart() {
-  Object.assign(state, { step: 'prompt', prompt: '', format: null, result: null, editing: false, snapshot: null, isNew: false, fullscreen: false, aiImage: null, seedTitle: '' });
+  Object.assign(state, { step: 'prompt', prompt: '', format: null, result: null, editing: false, snapshot: null, isNew: false, fullscreen: false, aiImage: null, seedTitle: '', publishHelp: false });
   renderCreate();
 }
 
@@ -888,7 +911,25 @@ async function handle(btn) {
     case 'publish':
       window.open(linkedInShareUrl(finalText(post)), '_blank', 'noopener');
       await copy(finalText(post));
-      toast('Texto copiado. Adjunta la gráfica en LinkedIn.');
+      // Guía para añadir la imagen: copiarla aquí y pegarla en el mismo post de LinkedIn.
+      state.publishHelp = true;
+      if (state.fullscreen) renderCreate();
+      toast(post.format === 'carousel' ? 'Texto copiado. Sube el PDF en LinkedIn.' : 'Texto copiado. Ahora copia la imagen y pégala en LinkedIn.');
+      break;
+    case 'copy-image':
+      btn.disabled = true;
+      try {
+        await copyPng($('#gen-preview'));
+        toast('Imagen copiada ✓ Pégala en LinkedIn con Ctrl/⌘+V');
+      } catch (err) {
+        console.error(err);
+        toast(err.message?.startsWith('Tu navegador') ? err.message : 'No se pudo copiar la imagen. Descarga el PNG.');
+      }
+      btn.disabled = false;
+      break;
+    case 'close-help':
+      state.publishHelp = false;
+      renderCreate();
       break;
     case 'edit':
       state.editing = true;

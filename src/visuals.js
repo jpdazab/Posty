@@ -281,6 +281,20 @@ function exportNodes(container) {
   return [...container.querySelectorAll('.visual-scale')];
 }
 
+// Copia la imagen al portapapeles para pegarla en LinkedIn (Ctrl/⌘+V en el editor del post).
+// El ClipboardItem se crea en el mismo clic con la imagen como promesa: Safari lo exige.
+export function canCopyImage() {
+  return Boolean(window.ClipboardItem && navigator.clipboard?.write);
+}
+
+export async function copyPng(container, index = 0) {
+  if (!canCopyImage()) throw new Error('Tu navegador no permite copiar imágenes. Descarga el PNG y súbelo en LinkedIn.');
+  const node = exportNodes(container)[index];
+  if (!node) throw new Error('No hay imagen que copiar.');
+  const blob = renderPng(node).then((url) => fetch(url)).then((r) => r.blob());
+  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+}
+
 export async function downloadPngs(container, baseName) {
   const nodes = exportNodes(container);
   for (const [i, node] of nodes.entries()) {
