@@ -68,7 +68,7 @@ const state = {
   isNew: false, // post todavía no guardado (pegado o desde cero)
   templateEdit: null, // id de plantilla integrada cuyo contenido por defecto se está editando
   needsCode: false,
-  fullscreen: false, // post abierto desde "Creados recientemente": vista a pantalla completa
+  fullscreen: false, // post a la vista: pantalla completa con el texto a la izquierda y el diseño a la derecha
   aiImage: null, // { target: 'layer:<id>' | 'visual:<ruta>', ratio, prompt, quality, loading, error }
 };
 
@@ -548,15 +548,19 @@ function renderFullscreen(post) {
   const over = text.length > LINKEDIN_MAX_CHARS;
   const editing = state.editing;
   const created = post.createdAt ? new Date(post.createdAt).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  const template = Boolean(state.templateEdit);
+  const title = template ? `Plantilla: ${BUILTIN_TEMPLATES.find((t) => t.id === state.templateEdit)?.name || ''}` : post.title || (state.isNew ? 'Nuevo post' : 'Sin título');
+  const canRegenerate = state.mode === 'ai' && state.prompt;
+  const switches = getKit().builtins ? ['carousel', 'card', 'slide'].filter((f) => f !== post.format && post.format !== 'custom') : [];
   return `
     <div class="post-modal" role="dialog" aria-modal="true" aria-label="${esc(post.title || 'Post')}">
       <header class="pm-bar">
         <button class="btn ghost small" data-create-action="${editing ? 'cancel-edit' : 'close-full'}">← ${editing ? 'Volver sin guardar' : 'Volver'}</button>
-        <div class="pm-title"><strong>${esc(post.title || 'Sin título')}</strong><span class="badge badge-aprobado">${esc(FORMAT_LABELS[post.format] || '')}</span></div>
+        <div class="pm-title"><strong>${esc(title)}</strong><span class="badge badge-aprobado">${esc(FORMAT_LABELS[post.format] || '')}</span>${state.isNew && !template ? '<span class="badge badge-pendiente">Sin guardar</span>' : ''}</div>
         <div class="actions">
           ${
             editing
-              ? '<button class="btn primary small" data-create-action="done-edit">Guardar</button>'
+              ? `<button class="btn primary small" data-create-action="done-edit">${template ? 'Guardar plantilla' : 'Guardar'}</button>`
               : `<button class="btn primary small" data-create-action="publish">${linkedinIcon()} Publicar</button>
                  <button class="btn ghost small" data-create-action="copy">Copiar texto</button>
                  <button class="btn ghost small" data-create-action="edit">Editar</button>
@@ -570,11 +574,16 @@ function renderFullscreen(post) {
         <section class="pm-text">
           ${
             editing
-              ? renderEditor(post)
+              ? `${template ? '<p class="muted small">Este es el contenido con el que empieza la plantilla al usarla en Crear post o al empezar desde cero.</p>' : ''}${renderEditor(post, { template })}`
               : `<p class="muted small">Texto para LinkedIn${created ? ` · creado el ${esc(created)}` : ''}</p>
                  <div class="pm-post-text">${esc(post.text) || '<span class="muted">Sin texto todavía. Pulsa Editar para escribirlo.</span>'}</div>
                  ${post.hashtags.length ? `<p class="hashtags">${esc(post.hashtags.join(' '))}</p>` : ''}
-                 <p class="count ${over ? 'over' : ''}">${text.length.toLocaleString('es')} / ${LINKEDIN_MAX_CHARS.toLocaleString('es')} caracteres${over ? ' · supera el límite de LinkedIn' : ''}</p>`
+                 <p class="count ${over ? 'over' : ''}">${text.length.toLocaleString('es')} / ${LINKEDIN_MAX_CHARS.toLocaleString('es')} caracteres${over ? ' · supera el límite de LinkedIn' : ''}</p>
+                 <div class="pm-more">
+                   ${canRegenerate ? '<button class="btn ghost small" data-create-action="regenerate">↻ Generar otra versión</button>' : ''}
+                   ${switches.map((f) => `<button class="btn ghost small" data-create-action="switch-format" data-format="${f}">Probar como ${FORMAT_LABELS[f].toLowerCase()}</button>`).join('')}
+                   <button class="btn ghost small" data-create-action="new">+ Nuevo post</button>
+                 </div>`
           }
         </section>
         <section class="pm-design"><div class="gen-preview" id="gen-preview">${renderPreview(post)}</div></section>
@@ -700,7 +709,8 @@ function schedulePreview() {
 
 // ---------- Acciones ----------
 
-function showResult(post, { editing = false, isNew = false, fullscreen = false } = {}) {
+// Todos los posts (nuevos o abiertos de la lista) se muestran a pantalla completa.
+function showResult(post, { editing = false, isNew = false, fullscreen = true } = {}) {
   state.fullscreen = fullscreen;
   state.result = post;
   state.aiImage = null;
@@ -717,6 +727,7 @@ async function generate() {
   state.step = 'loading';
   state.error = null;
   state.editing = false;
+  state.fullscreen = false; // mientras Claude escribe se ve la conversación; el resultado se abre a pantalla completa
   renderCreate();
   try {
     const backend = getBackend();
@@ -842,7 +853,7 @@ async function handle(btn) {
       const result = normalizePost(found);
       state.mode = result.prompt ? 'ai' : 'manual';
       state.prompt = result.prompt || '';
-      showResult(result, { fullscreen: true });
+      showResult(result);
       break;
     }
     case 'delete': {
@@ -877,6 +888,7 @@ async function handle(btn) {
         state.step = 'prompt';
         state.result = null;
         state.editing = false;
+        state.fullscreen = false;
         renderCreate();
       } else {
         state.result = state.snapshot;
