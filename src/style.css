@@ -836,8 +836,8 @@ body:has(#create-root:not([hidden]) .post-modal) { overflow: hidden; }
 
 /* My posts: el último creado destacado y el resto en tabla */
 .post-highlight {
-  display: grid; grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr); gap: 28px; align-items: start;
-  margin-bottom: 28px; padding: 20px; border-radius: var(--radius);
+  display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 22px; align-items: start;
+  margin-bottom: 22px; padding: 16px; border-radius: var(--radius);
   background: var(--surface); border: 1px solid color-mix(in srgb, var(--brand) 35%, var(--border));
   box-shadow: 0 0 0 4px var(--brand-soft), var(--shadow);
 }
@@ -845,10 +845,10 @@ body:has(#create-root:not([hidden]) .post-modal) { overflow: hidden; }
 .post-highlight-preview .visual-frame { border-radius: 8px; box-shadow: var(--shadow); }
 .post-highlight-preview:hover .visual-frame, .post-thumb-btn:hover .visual-frame { box-shadow: 0 0 0 2px var(--brand); }
 .post-highlight-preview:focus-visible, .post-thumb-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-.post-highlight-body { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 0; }
-.post-highlight-body h2 { margin: 0; font-size: 1.5rem; letter-spacing: -0.01em; }
+.post-highlight-body { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+.post-highlight-body h2 { margin: 0; font-size: 1.2rem; letter-spacing: -0.01em; }
 .post-highlight .eyebrow { margin: 0; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand); }
-.post-highlight-text { margin: 4px 0 0; white-space: pre-wrap; line-height: 1.55; max-height: 22em; overflow: auto; }
+.post-highlight-text { margin: 0; white-space: pre-wrap; line-height: 1.5; font-size: 0.92rem; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
 .post-highlight .hashtags { margin: 0; }
 .posts-table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 .posts-table { width: 100%; border-collapse: collapse; }
@@ -864,8 +864,8 @@ body:has(#create-root:not([hidden]) .post-modal) { overflow: hidden; }
 .posts-date { white-space: nowrap; }
 .posts-actions .actions { flex-wrap: nowrap; justify-content: flex-end; }
 @media (max-width: 760px) {
-  .post-highlight { grid-template-columns: minmax(0, 1fr); padding: 14px; gap: 16px; }
-  .post-highlight-preview { max-width: 360px; }
+  .post-highlight { grid-template-columns: 120px minmax(0, 1fr); padding: 12px; gap: 14px; }
+  .post-highlight .actions { flex-wrap: wrap; }
   .posts-table thead { display: none; }
   .posts-table tr { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 4px 12px; padding: 12px; border-bottom: 1px solid var(--border); }
   .posts-table td { padding: 0; border: 0; }

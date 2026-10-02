@@ -43,7 +43,7 @@ function highlight(p) {
         <span class="badge badge-pendiente">${esc(FORMAT_LABELS[p.format] || p.format)}</span>
         <p class="post-highlight-text">${esc(p.text || '')}</p>
         ${p.hashtags?.length ? `<p class="hashtags">${esc(p.hashtags.join(' '))}</p>` : ''}
-        <div class="actions start">${actions(p, '')}</div>
+        <div class="actions start">${actions(p)}</div>
       </div>
     </article>`;
 }
