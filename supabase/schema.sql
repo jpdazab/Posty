@@ -114,7 +114,7 @@ create or replace function public.create_ingest_token()
 returns text
 language plpgsql
 security definer
-set search_path = public, extensions
+set search_path = public
 as $$
 declare
   t text;
@@ -122,9 +122,10 @@ begin
   if auth.uid() is null then
     raise exception 'No has iniciado sesión';
   end if;
-  t := 'posty_' || encode(gen_random_bytes(24), 'hex');
+  -- Solo funciones que trae Postgres (sin extensiones): 2 UUID aleatorios = 244 bits; hash SHA-256.
+  t := 'posty_' || replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '');
   insert into public.ingest_tokens (user_id, token_hash)
-  values (auth.uid(), encode(digest(t, 'sha256'), 'hex'))
+  values (auth.uid(), encode(sha256(convert_to(t, 'UTF8')), 'hex'))
   on conflict (user_id) do update set token_hash = excluded.token_hash, created_at = now();
   return t;
 end;

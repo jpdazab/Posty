@@ -66,7 +66,7 @@ do $$ declare r int; begin
   if public.consume_ai_credit('00000000-0000-0000-0000-00000000000a', 2) <> 2 then raise exception 'la devolución no liberó un crédito'; end if;
 end $$;
 -- El hash del token coincide con sha256(token)
-select count(*) = 1 as token_ok from public.ingest_tokens where token_hash = encode(extensions.digest(:'token', 'sha256'), 'hex') \gset
+select count(*) = 1 as token_ok from public.ingest_tokens where token_hash = encode(sha256(convert_to(:'token', 'UTF8')), 'hex') \gset
 \if :token_ok
 \else
   select 1/0 as token_hash_no_coincide;

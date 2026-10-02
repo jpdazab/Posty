@@ -108,11 +108,13 @@ export function cloudBackend(client, user) {
     if (/bucket not found/i.test(error.message)) {
       throw new Error('Falta la carpeta de archivos "assets" en Supabase. Ejecuta supabase/schema.sql en el SQL Editor (ver SETUP.md).');
     }
-    if (/could not find the function|function .* does not exist/i.test(error.message)) {
-      throw new Error('Falta una función en Supabase (por ejemplo, la que crea el token). Vuelve a ejecutar supabase/schema.sql completo en el SQL Editor (ver SETUP.md) y recarga Posty.');
-    }
+    // Se añade el detalle técnico para poder saber qué falta exactamente.
+    const detail = ` (Detalle: ${error.message})`;
     if (/gen_random_bytes|digest\(|pgcrypto/i.test(error.message)) {
-      throw new Error('Falta la extensión pgcrypto en Supabase. Vuelve a ejecutar supabase/schema.sql completo en el SQL Editor (ver SETUP.md).');
+      throw new Error(`Supabase tiene una versión antigua de la función del token. Vuelve a ejecutar supabase/schema.sql completo (el último de GitHub) en el SQL Editor y recarga Posty.${detail}`);
+    }
+    if (/could not find the function|function .* does not exist/i.test(error.message)) {
+      throw new Error(`Falta una función en Supabase. Ejecuta supabase/schema.sql completo en el SQL Editor del mismo proyecto que usa Posty y recarga Posty.${detail}`);
     }
     if (/relation .* does not exist|could not find the table/i.test(error.message)) {
       throw new Error('Falta una tabla en Supabase. Vuelve a ejecutar supabase/schema.sql completo en el SQL Editor (ver SETUP.md).');
